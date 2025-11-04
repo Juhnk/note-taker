@@ -2,7 +2,7 @@
 
 ## System Overview
 
-NoteTaker is a native iOS/macOS note-taking application built with SwiftUI and backed by CloudKit for seamless synchronization.
+NoteTaker is a native iOS/macOS note-taking application built with SwiftUI, Core Data for persistence, and CloudKit for seamless synchronization.
 
 ---
 
@@ -13,7 +13,7 @@ NoteTaker is a native iOS/macOS note-taking application built with SwiftUI and b
 │                        Presentation Layer                    │
 │                          (SwiftUI)                           │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
-│  │  Home    │  │  Editor  │  │WhiteBoard│  │ Settings │   │
+│  │  Home    │  │  Editor  │  │  Search  │  │ Settings │   │
 │  │  View    │  │   View   │  │   View   │  │   View   │   │
 │  └──────────┘  └──────────┘  └──────────┘  └──────────┘   │
 └──────────────────────┬──────────────────────────────────────┘
@@ -32,7 +32,7 @@ NoteTaker is a native iOS/macOS note-taking application built with SwiftUI and b
 ┌─────────────────────────────────────────────────────────────┐
 │                       Service Layer                          │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │   CloudKit   │  │    Search    │  │  Attachment  │      │
+│  │  Core Data   │  │    Search    │  │  Attachment  │      │
 │  │   Service    │  │   Service    │  │   Service    │      │
 │  └──────────────┘  └──────────────┘  └──────────────┘      │
 └──────────────────────┬──────────────────────────────────────┘
@@ -40,10 +40,10 @@ NoteTaker is a native iOS/macOS note-taking application built with SwiftUI and b
                        ↓
 ┌─────────────────────────────────────────────────────────────┐
 │                        Data Layer                            │
-│                  (SwiftData + CloudKit)                      │
+│           (Core Data + NSPersistentCloudKitContainer)        │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
 │  │   Note   │  │  Folder  │  │   Tag    │  │Attachment│   │
-│  │  Model   │  │  Model   │  │  Model   │  │  Model   │   │
+│  │  Entity  │  │  Entity  │  │  Entity  │  │  Entity  │   │
 │  └──────────┘  └──────────┘  └──────────┘  └──────────┘   │
 └─────────────────────────────────────────────────────────────┘
                        │
@@ -69,11 +69,19 @@ NoteTaker is a native iOS/macOS note-taking application built with SwiftUI and b
 - `SearchView`: Search interface
 - `SettingsView`: App preferences
 
-**Guidelines**:
-- Views should be dumb (no business logic)
+**Design Guidelines**:
+- Minimal design: White, subtle greys, black text
+- No emojis in UI
+- No colors until Phase 2
+- System fonts with clear hierarchy
+- Generous whitespace
+
+**Implementation Guidelines**:
+- Views should be "dumb" (no business logic)
 - All state managed by ViewModels
 - Reusable components in `Components/` folder
 - Platform-specific adaptations using `#if os(iOS)` / `#if os(macOS)`
+- Use `@FetchRequest` or `@ObservedObject` for Core Data integration
 
 ---
 
@@ -98,15 +106,30 @@ class NotesViewModel {
     var isLoading = false
     var error: Error?
 
-    private let cloudKitService: CloudKitService
+    private let coreDataService: CoreDataService
     private let searchService: SearchService
 
-    func createNote(title: String, in folder: Folder?) async {
-        // Business logic here
+    init(coreDataService: CoreDataService) {
+        self.coreDataService = coreDataService
+        self.searchService = SearchService()
     }
 
-    func updateNote(_ note: Note) async {
-        // Business logic here
+    func createNote(title: String, in folder: Folder?) async {
+        await coreDataService.createNote(title: title, folder: folder)
+        await fetchNotes()
+    }
+
+    func updateNote(_ note: Note, content: Data) async {
+        await coreDataService.updateNote(note, content: content)
+    }
+
+    func deleteNote(_ note: Note) async {
+        await coreDataService.deleteNote(note)
+        await fetchNotes()
+    }
+
+    private func fetchNotes() async {
+        notes = await coreDataService.fetchNotes()
     }
 }
 ```
@@ -117,78 +140,263 @@ class NotesViewModel {
 
 **Responsibility**: Handle data operations, sync, and external integrations
 
-#### CloudKitService
+#### CoreDataService
 ```swift
-actor CloudKitService {
-    func save<T: CloudKitSyncable>(_ item: T) async throws
-    func fetch<T: CloudKitSyncable>(type: T.Type, predicate: NSPredicate) async throws -> [T]
-    func delete<T: CloudKitSyncable>(_ item: T) async throws
-    func syncAll() async throws
-    func resolveConflicts() async throws
+@MainActor
+class CoreDataService {
+    private let persistenceController: PersistenceController
+
+    var viewContext: NSManagedObjectContext {
+        persistenceController.container.viewContext
+    }
+
+    init(persistenceController: PersistenceController = .shared) {
+        self.persistenceController = persistenceController
+    }
+
+    func createNote(title: String, folder: Folder?) async throws -> Note {
+        let note = Note(context: viewContext)
+        note.id = UUID()
+        note.title = title
+        note.createdAt = Date()
+        note.modifiedAt = Date()
+        note.folder = folder
+
+        try viewContext.save()
+        return note
+    }
+
+    func fetchNotes(predicate: NSPredicate? = nil, sortDescriptors: [NSSortDescriptor] = []) -> [Note] {
+        let request = Note.fetchRequest()
+        request.predicate = predicate
+        request.sortDescriptors = sortDescriptors
+
+        return (try? viewContext.fetch(request)) ?? []
+    }
+
+    func updateNote(_ note: Note, content: Data) async throws {
+        note.contentData = content
+        note.modifiedAt = Date()
+        try viewContext.save()
+    }
+
+    func deleteNote(_ note: Note) async throws {
+        viewContext.delete(note)
+        try viewContext.save()
+    }
 }
 ```
 
 #### SearchService
 ```swift
 class SearchService {
-    func search(query: String, in notes: [Note]) -> [Note]
-    func searchByTag(_ tag: Tag) -> [Note]
-    func recentSearches() -> [String]
+    func search(query: String, in context: NSManagedObjectContext) -> [Note] {
+        let request = Note.fetchRequest()
+        request.predicate = NSPredicate(format: "title CONTAINS[cd] %@ OR contentData CONTAINS[cd] %@", query, query)
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \Note.modifiedAt, ascending: false)]
+
+        return (try? context.fetch(request)) ?? []
+    }
+
+    func searchByTag(_ tag: Tag, in context: NSManagedObjectContext) -> [Note] {
+        let request = Note.fetchRequest()
+        request.predicate = NSPredicate(format: "ANY tags == %@", tag)
+
+        return (try? context.fetch(request)) ?? []
+    }
 }
 ```
 
 #### AttachmentService
 ```swift
 class AttachmentService {
-    func upload(fileURL: URL) async throws -> Attachment
-    func download(_ attachment: Attachment) async throws -> URL
-    func delete(_ attachment: Attachment) async throws
+    private let coreDataService: CoreDataService
+
+    func upload(fileURL: URL, for note: Note) async throws -> Attachment {
+        let attachment = Attachment(context: coreDataService.viewContext)
+        attachment.id = UUID()
+        attachment.fileName = fileURL.lastPathComponent
+        attachment.fileSize = try fileURL.fileSize()
+        attachment.type = fileURL.attachmentType
+        attachment.note = note
+
+        // Copy to app's document directory
+        let localURL = try await copyToLocalStorage(fileURL)
+        attachment.localURL = localURL.absoluteString
+
+        try coreDataService.viewContext.save()
+
+        // CloudKit will sync automatically via NSPersistentCloudKitContainer
+        return attachment
+    }
+
+    func delete(_ attachment: Attachment) async throws {
+        if let localURLString = attachment.localURL,
+           let localURL = URL(string: localURLString) {
+            try? FileManager.default.removeItem(at: localURL)
+        }
+
+        coreDataService.viewContext.delete(attachment)
+        try coreDataService.viewContext.save()
+    }
+
+    private func copyToLocalStorage(_ url: URL) async throws -> URL {
+        // Implementation here
+        return url
+    }
 }
 ```
 
 ---
 
-### 4. Data Layer (Models)
+### 4. Data Layer (Core Data Models)
 
 **Responsibility**: Define data structures and persistence
 
-#### Note Model
+#### Core Data Schema
+
+The Core Data model is defined in `NoteTaker.xcdatamodeld` with the following entities:
+
+#### Note Entity
+```
+Entity Name: Note
+Class: Note (NSManagedObject)
+
+Attributes:
+- id: UUID (required, indexed)
+- title: String (required)
+- contentData: Binary Data (stores encoded AttributedString)
+- createdAt: Date (required)
+- modifiedAt: Date (required, indexed for sorting)
+- isPinned: Boolean (default: false)
+- cloudKitRecordID: String (optional, for tracking)
+- lastSyncedAt: Date (optional)
+- syncStatus: String (optional: pending, syncing, synced, conflict, error)
+
+Relationships:
+- folder: To-One to Folder (optional, cascade: nullify)
+- tags: To-Many to Tag (optional)
+- attachments: To-Many to Attachment (optional, cascade: delete)
+
+Fetched Properties:
+- recentNotes: modifiedAt > 7 days ago
+- pinnedNotes: isPinned == true
+```
+
+#### Folder Entity
+```
+Entity Name: Folder
+Class: Folder (NSManagedObject)
+
+Attributes:
+- id: UUID (required, indexed)
+- name: String (required)
+- icon: String (optional, SF Symbol name)
+- sortOrder: Integer 16 (default: 0)
+- createdAt: Date (required)
+
+Relationships:
+- parentFolder: To-One to Folder (optional, cascade: nullify)
+- subfolders: To-Many to Folder (optional, inverse: parentFolder)
+- notes: To-Many to Note (optional, inverse: folder, cascade: nullify)
+```
+
+#### Tag Entity
+```
+Entity Name: Tag
+Class: Tag (NSManagedObject)
+
+Attributes:
+- id: UUID (required, indexed)
+- name: String (required, unique)
+
+Relationships:
+- notes: To-Many to Note (optional, inverse: tags)
+```
+
+#### Attachment Entity
+```
+Entity Name: Attachment
+Class: Attachment (NSManagedObject)
+
+Attributes:
+- id: UUID (required, indexed)
+- type: String (required: image, video, file)
+- fileName: String (required)
+- fileSize: Integer 64
+- cloudKitAssetURL: String (optional, CKAsset reference)
+- localURL: String (optional, local file path)
+- thumbnailData: Binary Data (optional, for preview)
+
+Relationships:
+- note: To-One to Note (optional, inverse: attachments, cascade: nullify)
+```
+
+#### Generated NSManagedObject Subclasses
+
 ```swift
-@Model
-final class Note {
-    @Attribute(.unique) var id: UUID
-    var title: String
-    var content: AttributedString
-    var createdAt: Date
-    var modifiedAt: Date
-    var colorHex: String?
-    var isPinned: Bool = false
-
-    // Relationships
-    var folder: Folder?
-    var tags: [Tag] = []
-    var attachments: [Attachment] = []
-
-    // CloudKit tracking
-    var cloudKitRecordID: String?
-    var lastSyncedAt: Date?
-    var syncStatus: SyncStatus = .pending
-
-    init(title: String, content: AttributedString = AttributedString()) {
-        self.id = UUID()
-        self.title = title
-        self.content = content
-        self.createdAt = Date()
-        self.modifiedAt = Date()
-    }
+// Note+CoreDataClass.swift
+@objc(Note)
+public class Note: NSManagedObject {
+    // Core Data will generate properties
 }
 
-enum SyncStatus: Codable {
-    case pending
-    case syncing
-    case synced
-    case conflict
-    case error
+// Note+CoreDataProperties.swift
+extension Note {
+    @nonobjc public class func fetchRequest() -> NSFetchRequest<Note> {
+        return NSFetchRequest<Note>(entityName: "Note")
+    }
+
+    @NSManaged public var id: UUID
+    @NSManaged public var title: String
+    @NSManaged public var contentData: Data
+    @NSManaged public var createdAt: Date
+    @NSManaged public var modifiedAt: Date
+    @NSManaged public var isPinned: Bool
+    @NSManaged public var cloudKitRecordID: String?
+    @NSManaged public var lastSyncedAt: Date?
+    @NSManaged public var syncStatus: String?
+    @NSManaged public var folder: Folder?
+    @NSManaged public var tags: NSSet?
+    @NSManaged public var attachments: NSSet?
+}
+
+// MARK: - Convenience
+extension Note {
+    public var wrappedTitle: String {
+        title ?? "Untitled"
+    }
+
+    public var tagsArray: [Tag] {
+        let set = tags as? Set<Tag> ?? []
+        return set.sorted { $0.name < $1.name }
+    }
+
+    public var attachmentsArray: [Attachment] {
+        let set = attachments as? Set<Attachment> ?? []
+        return set.sorted { $0.fileName < $1.fileName }
+    }
+
+    // Decode AttributedString from contentData
+    public var attributedContent: AttributedString {
+        get {
+            guard let data = contentData,
+                  let attributed = try? NSKeyedUnarchiver.unarchivedObject(
+                    ofClass: NSAttributedString.self,
+                    from: data
+                  ) else {
+                return AttributedString()
+            }
+            return AttributedString(attributed)
+        }
+        set {
+            let nsAttributed = NSAttributedString(newValue)
+            contentData = try? NSKeyedArchiver.archivedData(
+                withRootObject: nsAttributed,
+                requiringSecureCoding: true
+            )
+        }
+    }
 }
 ```
 
@@ -205,16 +413,17 @@ User Action (Tap '+' button)
          ↓
 NotesViewModel.createNote()
          ↓
-  1. Create Note model
-  2. Save to SwiftData
+CoreDataService.createNote()
          ↓
-CloudKitService.save(note)
+  1. Create Note entity in NSManagedObjectContext
+  2. Set properties
+  3. Save context
          ↓
-  Upload to CloudKit
+NSPersistentCloudKitContainer
+  automatically syncs to CloudKit
          ↓
-  Update sync status
-         ↓
-  View auto-updates (@Observable)
+  View auto-updates via @FetchRequest
+  or ViewModel refresh
 ```
 
 ### Syncing Between Devices
@@ -222,100 +431,161 @@ CloudKitService.save(note)
 ```
 Device A: Modify note
          ↓
-CloudKitService uploads change
+Core Data saves to viewContext
+         ↓
+NSPersistentCloudKitContainer
+  detects change, uploads to CloudKit
          ↓
     CloudKit servers
          ↓
-CloudKit push notification
+CloudKit push notification to Device B
          ↓
-Device B: CloudKitService receives
+NSPersistentCloudKitContainer
+  downloads change on Device B
          ↓
-Download updated note
+Core Data updates local store
          ↓
-Update SwiftData
+@FetchRequest detects change
          ↓
 View auto-updates
 ```
 
----
-
-## CloudKit Schema
-
-### Note Record
-```
-Type: Note
-Fields:
-- id: String (UUID)
-- title: String
-- contentData: Data (encoded AttributedString)
-- createdAt: Date
-- modifiedAt: Date
-- colorHex: String?
-- isPinned: Int (Bool)
-- folderReference: Reference (to Folder)
-- tagReferences: List<Reference> (to Tags)
-```
-
-### Folder Record
-```
-Type: Folder
-Fields:
-- id: String (UUID)
-- name: String
-- colorHex: String?
-- icon: String?
-- parentFolderReference: Reference (to Folder)
-- sortOrder: Int
-- createdAt: Date
-```
-
-### Attachment Record
-```
-Type: Attachment
-Fields:
-- id: String (UUID)
-- fileName: String
-- fileSize: Int
-- asset: Asset (CKAsset for file data)
-- type: String (AttachmentType)
-- noteReference: Reference (to Note)
-```
+**Key Advantage**: NSPersistentCloudKitContainer handles all sync logic automatically. We just save to Core Data and CloudKit sync happens behind the scenes.
 
 ---
 
-## Sync Strategy
+## Persistence Setup
 
-### Initial Setup
-1. User signs in with Apple ID
-2. App checks for existing CloudKit data
-3. If found, download all records
-4. Populate SwiftData with synced data
-5. Enable change tracking
+### PersistenceController
 
-### Real-time Sync
-1. **Change Detection**: SwiftData notifications trigger sync
-2. **Batching**: Group changes within 2-second window
-3. **Upload**: Send batched changes to CloudKit
-4. **Subscriptions**: Listen for remote changes
-5. **Download**: Fetch and merge remote changes
-
-### Conflict Resolution Algorithm
 ```swift
-func resolveConflict(local: Note, remote: Note) -> Note {
-    // Last Write Wins strategy
-    if local.modifiedAt > remote.modifiedAt {
-        return local
-    } else {
-        return remote
+import CoreData
+
+struct PersistenceController {
+    static let shared = PersistenceController()
+
+    let container: NSPersistentCloudKitContainer
+
+    init(inMemory: Bool = false) {
+        container = NSPersistentCloudKitContainer(name: "NoteTaker")
+
+        if inMemory {
+            container.persistentStoreDescriptions.first!.url = URL(fileURLWithPath: "/dev/null")
+        }
+
+        // Configure CloudKit sync
+        guard let description = container.persistentStoreDescriptions.first else {
+            fatalError("Failed to retrieve persistent store description")
+        }
+
+        // Enable persistent history tracking for CloudKit
+        description.setOption(true as NSNumber, forKey: NSPersistentHistoryTrackingKey)
+        description.setOption(true as NSNumber, forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)
+
+        // CloudKit container options
+        let cloudKitContainerOptions = NSPersistentCloudKitContainerOptions(containerIdentifier: "iCloud.com.yourname.NoteTaker")
+        description.cloudKitContainerOptions = cloudKitContainerOptions
+
+        container.loadPersistentStores { storeDescription, error in
+            if let error = error as NSError? {
+                // Handle error appropriately
+                fatalError("Unresolved error \(error), \(error.userInfo)")
+            }
+        }
+
+        // Automatically merge changes from parent
+        container.viewContext.automaticallyMergesChangesFromParent = true
+        container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+
+        // Set up notifications for remote changes
+        NotificationCenter.default.addObserver(
+            forName: .NSPersistentStoreRemoteChange,
+            object: container.persistentStoreCoordinator,
+            queue: .main
+        ) { _ in
+            // Handle remote changes if needed
+        }
     }
+
+    static var preview: PersistenceController = {
+        let controller = PersistenceController(inMemory: true)
+        let viewContext = controller.container.viewContext
+
+        // Create sample data for preview
+        let folder = Folder(context: viewContext)
+        folder.id = UUID()
+        folder.name = "Work"
+        folder.createdAt = Date()
+
+        let note = Note(context: viewContext)
+        note.id = UUID()
+        note.title = "Sample Note"
+        note.createdAt = Date()
+        note.modifiedAt = Date()
+        note.folder = folder
+
+        do {
+            try viewContext.save()
+        } catch {
+            let nsError = error as NSError
+            fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
+        }
+
+        return controller
+    }()
 }
 ```
 
-### Offline Support
-- All operations work offline
-- Changes queued in `PendingSyncQueue`
-- Auto-sync when network returns
-- Show sync status indicator
+---
+
+## CloudKit Integration
+
+### Automatic Sync with NSPersistentCloudKitContainer
+
+NSPersistentCloudKitContainer provides automatic CloudKit sync with zero additional code. It:
+
+1. Automatically exports local changes to CloudKit
+2. Imports remote changes from CloudKit
+3. Resolves conflicts using merge policies
+4. Handles network availability
+5. Batches changes efficiently
+
+### CloudKit Container Setup
+
+1. In Xcode, select project target
+2. Go to "Signing & Capabilities"
+3. Add "iCloud" capability
+4. Check "CloudKit"
+5. Create/select container: `iCloud.com.yourname.NoteTaker`
+6. Ensure container identifier matches PersistenceController
+
+### CloudKit Schema
+
+NSPersistentCloudKitContainer automatically:
+- Creates CloudKit record types from Core Data entities
+- Maps attributes to CloudKit fields
+- Creates references for relationships
+- Handles CKAssets for Binary Data
+
+**Generated CloudKit Schema**:
+- `CD_Note` record type
+- `CD_Folder` record type
+- `CD_Tag` record type
+- `CD_Attachment` record type
+
+### Conflict Resolution
+
+Configure merge policy in PersistenceController:
+
+```swift
+container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+```
+
+Options:
+- `NSMergeByPropertyObjectTrumpMergePolicy`: Local changes win (default)
+- `NSMergeByPropertyStoreTrumpMergePolicy`: Remote changes win
+- `NSOverwriteMergePolicy`: Last write wins
+- Custom policy for advanced scenarios
 
 ---
 
@@ -323,15 +593,22 @@ func resolveConflict(local: Note, remote: Note) -> Note {
 
 ```
 NoteTaker/
-├── NoteTakerApp.swift              # App entry point
+├── NoteTakerApp.swift              # App entry point with @main
 ├── ContentView.swift               # Root view
 │
+├── NoteTaker.xcdatamodeld/         # Core Data model
+│   └── NoteTaker.xcdatamodel       # Entity definitions
+│
 ├── Models/
-│   ├── Note.swift                  # Note data model
-│   ├── Folder.swift                # Folder data model
-│   ├── Tag.swift                   # Tag data model
-│   ├── Attachment.swift            # Attachment data model
-│   └── SyncStatus.swift            # Sync status enum
+│   ├── Note+CoreDataClass.swift            # Note entity
+│   ├── Note+CoreDataProperties.swift       # Generated properties
+│   ├── Folder+CoreDataClass.swift          # Folder entity
+│   ├── Folder+CoreDataProperties.swift     # Generated properties
+│   ├── Tag+CoreDataClass.swift             # Tag entity
+│   ├── Tag+CoreDataProperties.swift        # Generated properties
+│   ├── Attachment+CoreDataClass.swift      # Attachment entity
+│   ├── Attachment+CoreDataProperties.swift # Generated properties
+│   └── SyncStatus.swift                    # Sync status enum
 │
 ├── Views/
 │   ├── Home/
@@ -342,12 +619,9 @@ NoteTaker/
 │   │   ├── EditorView.swift        # Note editor
 │   │   ├── FormattingToolbar.swift # Rich text toolbar
 │   │   └── MarkdownPreview.swift   # Markdown preview
-│   ├── Whiteboard/
-│   │   └── WhiteboardView.swift    # Canvas for drawing
 │   ├── Components/
 │   │   ├── NoteCard.swift          # Note list item
 │   │   ├── FolderRow.swift         # Folder list item
-│   │   ├── ColorPicker.swift       # Color selection
 │   │   └── SearchBar.swift         # Search component
 │   └── Settings/
 │       └── SettingsView.swift      # App settings
@@ -356,24 +630,25 @@ NoteTaker/
 │   ├── NotesViewModel.swift        # Note management
 │   ├── FoldersViewModel.swift      # Folder management
 │   ├── SearchViewModel.swift       # Search logic
-│   └── SyncViewModel.swift         # Sync coordination
+│   └── SyncViewModel.swift         # Sync status monitoring
 │
 ├── Services/
-│   ├── CloudKitService.swift       # CloudKit operations
+│   ├── PersistenceController.swift # Core Data + CloudKit setup
+│   ├── CoreDataService.swift       # Core Data operations
 │   ├── SearchService.swift         # Search functionality
-│   ├── AttachmentService.swift     # File management
-│   └── PersistenceController.swift # SwiftData setup
+│   └── AttachmentService.swift     # File management
 │
 ├── Utilities/
 │   ├── Extensions/
 │   │   ├── AttributedString+Extensions.swift
 │   │   ├── Color+Extensions.swift
-│   │   └── Date+Extensions.swift
+│   │   ├── Date+Extensions.swift
+│   │   └── URL+Extensions.swift
 │   ├── Constants.swift             # App constants
 │   └── CloudKitConfig.swift        # CloudKit configuration
 │
 └── Resources/
-    ├── Assets.xcassets             # Images, colors
+    ├── Assets.xcassets             # Images, colors (minimal)
     └── Localizable.strings         # Translations
 ```
 
@@ -383,29 +658,29 @@ NoteTaker/
 
 ### Unit Tests
 - ViewModels business logic
-- Services (with mocked CloudKit)
-- Data model validation
+- Core Data CRUD operations (using in-memory store)
 - Search algorithms
-- Conflict resolution logic
+- Data transformations (AttributedString encoding/decoding)
 
 ### Integration Tests
-- SwiftData + CloudKit sync
-- Offline → Online transitions
+- Core Data + CloudKit sync
+- Offline to online transitions
 - Multi-device sync scenarios
+- Conflict resolution
 
 ### UI Tests
 - Critical user flows:
   - Create note
-  - Edit note
-  - Create folder
+  - Edit note with rich text
+  - Create folder hierarchy
   - Search notes
-  - Sync between devices
+  - Verify sync status
 
 ### Performance Tests
-- List view with 1000+ notes
-- Search performance
-- Sync time for large datasets
-- Memory usage during editing
+- NSFetchedResultsController with 1000+ notes
+- Search performance with large dataset
+- Sync time for 100+ notes
+- Memory usage during editing with images
 
 ---
 
@@ -413,51 +688,75 @@ NoteTaker/
 
 ### Data Protection
 - CloudKit automatic encryption at rest and in transit
-- Keychain for sensitive local data
-- No plaintext credentials stored
-- Biometric authentication option (future)
+- Keychain for sensitive local data (if any)
+- No plaintext credentials
+- File system encryption via iOS/macOS
 
 ### Privacy
 - No analytics or crash reporting
 - No third-party SDKs
-- All data stays in user's iCloud
-- Export data anytime
+- All data stays in user's iCloud private database
+- Export data anytime (to JSON, Markdown, PDF)
 
 ### Code Security
-- Input validation on all user data
-- Sanitize rich text content
+- Input validation on user data
+- Sanitize rich text content to prevent injection
 - Secure file handling for attachments
-- CloudKit permission checks
+- CloudKit permission checks (private database only)
 
 ---
 
 ## Performance Optimizations
 
-### Lazy Loading
+### NSFetchedResultsController
+
+Use for efficient list views:
+
 ```swift
-// Only load visible notes
-List(notes.prefix(50)) { note in
-    NoteCard(note: note)
+class NotesViewModel: NSObject, ObservableObject {
+    @Published var notes: [Note] = []
+
+    private var fetchedResultsController: NSFetchedResultsController<Note>?
+
+    func setupFetchedResultsController(context: NSManagedObjectContext) {
+        let request = Note.fetchRequest()
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \Note.modifiedAt, ascending: false)]
+        request.fetchBatchSize = 20
+
+        fetchedResultsController = NSFetchedResultsController(
+            fetchRequest: request,
+            managedObjectContext: context,
+            sectionNameKeyPath: nil,
+            cacheName: "NotesCache"
+        )
+
+        fetchedResultsController?.delegate = self
+
+        try? fetchedResultsController?.performFetch()
+        notes = fetchedResultsController?.fetchedObjects ?? []
+    }
 }
-.onAppear {
-    loadMoreNotes()
+
+extension NotesViewModel: NSFetchedResultsControllerDelegate {
+    func controllerDidChangeContent(_ controller: NSFetchedResultsController<NSFetchRequestResult>) {
+        notes = controller.fetchedObjects as? [Note] ?? []
+    }
 }
 ```
 
 ### Image Caching
-- Cache downloaded attachments locally
-- Use low-res thumbnails in lists
-- Full-res only in detail view
+- Store thumbnails as Binary Data in Core Data
+- Full images in app's documents directory
+- CloudKit handles CKAsset caching
 
 ### Search Indexing
-- Maintain searchable index in SwiftData
-- Update index on note changes
-- Use Core Spotlight for system-wide search
+- Use Core Data predicates for search
+- Index frequently searched attributes
+- Consider Core Spotlight integration for system-wide search
 
 ### Batch Operations
-- Batch CloudKit operations (max 400 per request)
-- Debounce sync triggers
-- Background processing for large syncs
+- CloudKit batching handled automatically by NSPersistentCloudKitContainer
+- Use batch Core Data operations for bulk updates
 
 ---
 
@@ -466,7 +765,8 @@ List(notes.prefix(50)) { note in
 ### Error Types
 ```swift
 enum NoteTakerError: Error, LocalizedError {
-    case syncFailed(underlying: Error)
+    case coreDataSaveFailed(Error)
+    case syncFailed(Error)
     case networkUnavailable
     case cloudKitQuotaExceeded
     case attachmentTooLarge
@@ -475,6 +775,8 @@ enum NoteTakerError: Error, LocalizedError {
 
     var errorDescription: String? {
         switch self {
+        case .coreDataSaveFailed(let error):
+            return "Failed to save: \(error.localizedDescription)"
         case .syncFailed(let error):
             return "Sync failed: \(error.localizedDescription)"
         case .networkUnavailable:
@@ -482,21 +784,21 @@ enum NoteTakerError: Error, LocalizedError {
         case .cloudKitQuotaExceeded:
             return "iCloud storage full. Please free up space."
         case .attachmentTooLarge:
-            return "Attachment too large. Maximum size is 25MB."
+            return "Attachment too large. Maximum size is 250MB."
         case .invalidNoteData:
             return "Unable to load note. The data may be corrupted."
         case .conflictResolutionFailed:
-            return "Unable to resolve sync conflict. Please try again."
+            return "Unable to resolve sync conflict."
         }
     }
 }
 ```
 
 ### Error Recovery
-1. **Automatic Retry**: Network errors retry 3 times with exponential backoff
-2. **User Notification**: Show error banner with action button
-3. **Offline Queue**: Queue failed operations for retry
-4. **Fallback**: Save locally if CloudKit unavailable
+1. **Automatic Retry**: Network errors handled by NSPersistentCloudKitContainer
+2. **User Notification**: Show error banner with clear message
+3. **Offline Queue**: Changes saved locally, synced when online
+4. **Fallback**: All operations work offline
 
 ---
 
@@ -505,7 +807,7 @@ enum NoteTakerError: Error, LocalizedError {
 ### Support For
 - VoiceOver (screen reader)
 - Dynamic Type (scalable fonts)
-- Keyboard navigation
+- Keyboard navigation (especially macOS)
 - Reduce Motion
 - High Contrast
 - Voice Control
@@ -513,9 +815,14 @@ enum NoteTakerError: Error, LocalizedError {
 ### Implementation
 ```swift
 Text(note.title)
-    .accessibilityLabel("Note titled \(note.title)")
-    .accessibilityHint("Double tap to open")
-    .dynamicTypeSize(.large ... .xxxLarge)
+    .accessibilityLabel("Note titled \(note.wrappedTitle)")
+    .accessibilityHint("Double tap to open note")
+    .accessibilityAddTraits(.isButton)
+
+Button(action: createNote) {
+    Image(systemName: "plus")
+}
+.accessibilityLabel("Create new note")
 ```
 
 ---
@@ -526,19 +833,17 @@ Text(note.title)
 - English (primary)
 
 ### Future
-- Spanish
-- French
-- German
-- Chinese (Simplified)
+- Spanish, French, German, Chinese (Simplified)
 
 ### Implementation
 - All user-facing strings in `Localizable.strings`
-- Use `LocalizedStringKey` for SwiftUI
+- Use `LocalizedStringKey` in SwiftUI
 - Date/time formatting respects locale
+- Core Data attributes support localization
 
 ---
 
-## Monitoring & Analytics
+## Monitoring
 
 ### NO Third-Party Analytics
 - Privacy-first approach
@@ -548,40 +853,58 @@ Text(note.title)
 ### Internal Metrics (Local Only)
 - App launch count
 - Notes created count
-- Sync success rate
+- Sync events logged locally
 - Performance benchmarks
 
-Metrics stored locally, never sent anywhere.
+All metrics stored locally in UserDefaults, never sent anywhere.
 
 ---
 
 ## Future Architecture Enhancements
 
 ### Phase 2+
-1. **Widget Extension**: Home screen widgets
-2. **Share Extension**: Save content from other apps
-3. **Watch Extension**: Quick note capture
-4. **Background Sync**: Using BGTaskScheduler
-5. **Core Spotlight**: System-wide search integration
-6. **Handoff**: Continue editing across devices
-7. **CloudKit Sharing**: Share notes with other users
+1. **Widget Extension**: Home screen/lock screen widgets
+2. **Share Extension**: Save content from Safari, other apps
+3. **Core Spotlight**: System-wide search integration
+4. **Handoff**: Continue editing across devices
+5. **Shortcuts**: Siri integration
+6. **CloudKit Sharing**: Share individual notes
 
 ### Considerations
-- Plugin architecture for extensions
-- Shared framework for common code
-- Webhook support for automation
-- GraphQL API (if going multi-platform beyond Apple)
+- Extensions share data via App Group
+- Shared Core Data store across extensions
+- Background fetch for sync
+- CloudKit subscriptions for real-time updates
+
+---
+
+## Migration Strategy
+
+### From SwiftData (if needed)
+If SwiftData matures in 2-3 years:
+1. Core Data can migrate to SwiftData
+2. Export data to portable format
+3. Import into SwiftData models
+4. Test thoroughly before release
+
+### Version Updates
+- Use Core Data lightweight migration for schema changes
+- Add migration mappings for complex changes
+- Test migration on large datasets
 
 ---
 
 ## Conclusion
 
 This architecture provides:
-- ✅ Clean separation of concerns
-- ✅ Testable components
-- ✅ Scalable data layer
-- ✅ Reliable sync mechanism
-- ✅ Offline-first experience
-- ✅ Native performance
+- Clean separation of concerns
+- Testable components
+- Stable, proven data layer (Core Data)
+- Reliable sync via NSPersistentCloudKitContainer
+- Offline-first experience
+- Native performance
+- Production-ready foundation
 
-Ready to build! 🚀
+Key advantage over SwiftData: Stability and maturity. Core Data has 15+ years of production use and handles large datasets reliably.
+
+Ready to build.

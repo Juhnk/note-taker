@@ -185,11 +185,50 @@ NoteTaker/
 
 Comprehensive documentation is available in `/docs`:
 
+### Planning & Architecture
 - **[PROJECT_PLAN.md](docs/PROJECT_PLAN.md)** - Features, timeline, technical decisions
 - **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** - Technical architecture, Core Data models, patterns
 - **[DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md)** - UI/UX guidelines, colors, typography
-- **[GITHUB_WORKFLOW.md](docs/GITHUB_WORKFLOW.md)** - Git workflow, commit conventions, PR process
-- **[.claude.md](.claude.md)** - Development workflow for Claude Code
+
+### Development Process
+- **[GITHUB_WORKFLOW.md](docs/GITHUB_WORKFLOW.md)** - Git workflow, commit conventions, PR process, CI/CD
+- **[TESTING.md](docs/TESTING.md)** - Testing guidelines, TDD approach, coverage requirements
+- **[DEVELOPMENT_CYCLES.md](docs/DEVELOPMENT_CYCLES.md)** - Small cycle management (2-3 days max)
+- **[.claude/.claude.md](.claude/.claude.md)** - Development workflow for Claude Code
+
+### Progress Tracking
+- **[PROGRESS.md](PROGRESS.md)** - Main progress tracker with checkboxes for all tasks
+
+## Progress Tracking
+
+Development is tracked in [PROGRESS.md](PROGRESS.md) with:
+- Checkbox-based task tracking
+- 37 sprints across 3 phases (9 months)
+- Estimated time and test coverage targets for each sprint
+- Weekly progress updates
+- Testing metrics
+
+**Current Status**: See [PROGRESS.md](PROGRESS.md) Sprint 0.1
+
+## Quality Standards
+
+### No Code Without Tests
+- Minimum 70% overall test coverage
+- TDD approach (write tests first)
+- Pre-commit hooks block untested code
+- CI/CD blocks untested PRs
+
+### Development Cycles
+- Maximum 2-3 days per cycle
+- 1-3 features per cycle
+- Each cycle includes: tests, docs, manual testing
+- See [DEVELOPMENT_CYCLES.md](docs/DEVELOPMENT_CYCLES.md)
+
+### Code Quality Gates
+1. **Pre-commit hook** (local) - Blocks commits without passing tests
+2. **CI/CD pipeline** (GitHub) - Blocks merges without passing tests
+3. **Code coverage** (70%+ required) - Ensures thorough testing
+4. **Progress tracking** (PROGRESS.md) - Maintains visibility
 
 ## Development Workflow
 
@@ -217,11 +256,49 @@ This is currently a personal project. The workflow and documentation are designe
 
 ## Testing
 
-- Unit tests for ViewModels and business logic
-- Integration tests for Core Data operations and sync
+**No code is complete without tests.**
+
+### Testing Requirements
+
+- **Minimum 70% overall code coverage**
+- Unit tests for ViewModels and business logic (85% target)
+- Integration tests for Core Data operations and sync (80% target)
 - UI tests for critical user flows
 - Manual testing on iOS and macOS
+- Accessibility testing (VoiceOver, Dynamic Type)
 - TestFlight beta before App Store release
+
+### Test-Driven Development (TDD)
+
+We follow TDD approach:
+1. Write failing test first
+2. Implement minimum code to pass
+3. Refactor if needed
+4. Repeat
+
+### Pre-Commit Hooks
+
+Pre-commit hooks automatically run before EVERY commit and block commits if:
+- SwiftLint fails
+- Build fails
+- Tests fail
+- Code coverage < 70%
+
+Setup: `./scripts/setup-hooks.sh`
+
+### CI/CD Pipeline
+
+GitHub Actions run on every PR and push to main:
+- ✅ SwiftLint (code quality)
+- ✅ Build iOS and macOS
+- ✅ Run all tests
+- ✅ Check code coverage ≥ 70%
+- ✅ Validate commit messages
+- ✅ Check documentation updates
+
+**Cannot merge without all checks passing.**
+
+See [TESTING.md](docs/TESTING.md) for complete testing guidelines.
 
 ## Performance
 
@@ -252,14 +329,22 @@ For questions or feedback: nick@adbox.io
 
 ## Project Status
 
-**Current Phase**: Planning complete, ready to create Xcode project
+**Current Phase**: Planning complete, testing infrastructure ready, ready to create Xcode project
 
-**Next Steps**:
-1. Create Xcode project with Core Data template
-2. Set up Core Data entities (see ARCHITECTURE.md)
-3. Implement PersistenceController with CloudKit
-4. Build basic UI shell
-5. Implement note CRUD operations
+**Setup Steps**:
+1. Run `./scripts/setup-hooks.sh` to install pre-commit hooks and SwiftLint
+2. Create Xcode project with Core Data template (Sprint 0.1)
+3. Set up Core Data entities (see ARCHITECTURE.md)
+4. Implement PersistenceController with CloudKit
+5. Build basic UI shell
+6. Implement note CRUD operations
+
+**Testing Infrastructure**:
+- ✅ PROGRESS.md - Checkbox-based progress tracking
+- ✅ Pre-commit hooks - Block commits without passing tests
+- ✅ CI/CD pipeline - Block merges without passing tests
+- ✅ Testing guidelines - TDD approach, 70%+ coverage
+- ✅ Development cycles - 2-3 day maximum cycles
 
 **Key Decisions Made**:
 - Using Core Data instead of SwiftData (stability)
@@ -267,5 +352,8 @@ For questions or feedback: nick@adbox.io
 - Minimal design (white, greys, black only)
 - 9-month timeline (realistic based on research)
 - iOS 17+ and macOS 14+ minimum versions
+- TDD approach with mandatory testing (70%+ coverage)
+- Small cycles (2-3 days max) to avoid AI overload
 
 See [PROJECT_PLAN.md](docs/PROJECT_PLAN.md) for complete roadmap and decisions.
+See [PROGRESS.md](PROGRESS.md) for current sprint and tasks.

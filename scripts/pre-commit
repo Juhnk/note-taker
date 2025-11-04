@@ -1,0 +1,166 @@
+#!/bin/bash
+
+# Pre-commit hook for NoteTaker
+# Ensures no commits without passing tests
+# This hook prevents commits if:
+# - SwiftLint fails
+# - Build fails
+# - Tests fail
+# - Test coverage is below 70%
+
+set -e
+
+echo "🔍 Running pre-commit checks..."
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Check if Xcode project exists
+if [ ! -d "NoteTaker.xcodeproj" ] && [ ! -d "NoteTaker.xcworkspace" ]; then
+    echo -e "${YELLOW}⚠️  Xcode project not found - skipping build and test checks${NC}"
+    echo "Pre-commit checks will be enforced once Xcode project is created"
+    exit 0
+fi
+
+# 1. Run SwiftLint
+echo ""
+echo "📝 Running SwiftLint..."
+if command -v swiftlint &> /dev/null; then
+    if swiftlint lint --strict; then
+        echo -e "${GREEN}✓ SwiftLint passed${NC}"
+    else
+        echo -e "${RED}✗ SwiftLint failed${NC}"
+        echo "Fix linting errors before committing"
+        exit 1
+    fi
+else
+    echo -e "${YELLOW}⚠️  SwiftLint not installed. Install with: brew install swiftlint${NC}"
+    exit 1
+fi
+
+# 2. Check for debug print statements
+echo ""
+echo "🐛 Checking for debug print statements..."
+if git diff --cached --name-only | grep "\.swift$" | xargs grep -n "print(" 2>/dev/null; then
+    echo -e "${YELLOW}⚠️  Warning: Found print() statements in staged files${NC}"
+    echo "Consider removing debug prints or using proper logging"
+    read -p "Continue anyway? (y/n) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        exit 1
+    fi
+fi
+
+# 3. Build the project
+echo ""
+echo "🔨 Building iOS target..."
+if xcodebuild -scheme NoteTaker -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 15 Pro' build CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO ONLY_ACTIVE_ARCH=YES -quiet; then
+    echo -e "${GREEN}✓ iOS build succeeded${NC}"
+else
+    echo -e "${RED}✗ iOS build failed${NC}"
+    echo "Fix build errors before committing"
+    exit 1
+fi
+
+echo ""
+echo "🔨 Building macOS target..."
+if xcodebuild -scheme NoteTaker -sdk macosx -destination 'platform=macOS' build CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO ONLY_ACTIVE_ARCH=YES -quiet; then
+    echo -e "${GREEN}✓ macOS build succeeded${NC}"
+else
+    echo -e "${RED}✗ macOS build failed${NC}"
+    echo "Fix build errors before committing"
+    exit 1
+fi
+
+# 4. Run tests
+echo ""
+echo "🧪 Running iOS tests..."
+DERIVED_DATA_PATH=$(mktemp -d)
+if xcodebuild test \
+    -scheme NoteTaker \
+    -sdk iphonesimulator \
+    -destination 'platform=iOS Simulator,name=iPhone 15 Pro' \
+    -enableCodeCoverage YES \
+    -derivedDataPath "$DERIVED_DATA_PATH" \
+    CODE_SIGN_IDENTITY="" \
+    CODE_SIGNING_REQUIRED=NO \
+    ONLY_ACTIVE_ARCH=YES \
+    -quiet 2>&1 | grep -v "^$"; then
+    echo -e "${GREEN}✓ iOS tests passed${NC}"
+else
+    echo -e "${RED}✗ iOS tests failed${NC}"
+    echo "Fix failing tests before committing"
+    rm -rf "$DERIVED_DATA_PATH"
+    exit 1
+fi
+
+echo ""
+echo "🧪 Running macOS tests..."
+if xcodebuild test \
+    -scheme NoteTaker \
+    -sdk macosx \
+    -destination 'platform=macOS' \
+    -enableCodeCoverage YES \
+    -derivedDataPath "$DERIVED_DATA_PATH" \
+    CODE_SIGN_IDENTITY="" \
+    CODE_SIGNING_REQUIRED=NO \
+    ONLY_ACTIVE_ARCH=YES \
+    -quiet 2>&1 | grep -v "^$"; then
+    echo -e "${GREEN}✓ macOS tests passed${NC}"
+else
+    echo -e "${RED}✗ macOS tests failed${NC}"
+    echo "Fix failing tests before committing"
+    rm -rf "$DERIVED_DATA_PATH"
+    exit 1
+fi
+
+# 5. Check code coverage
+echo ""
+echo "📊 Checking code coverage..."
+
+# Find the most recent test result
+XCRESULT=$(find "$DERIVED_DATA_PATH/Logs/Test" -name "*.xcresult" | head -1)
+
+if [ -n "$XCRESULT" ]; then
+    # Extract coverage percentage
+    COVERAGE=$(xcrun xccov view --report "$XCRESULT" | grep "NoteTaker.app" | awk '{print $4}' | sed 's/%//' || echo "0")
+
+    if [ -n "$COVERAGE" ]; then
+        echo "Code coverage: ${COVERAGE}%"
+
+        # Check if coverage is below 70%
+        if (( $(echo "$COVERAGE < 70" | bc -l) )); then
+            echo -e "${RED}✗ Code coverage is below 70% (got ${COVERAGE}%)${NC}"
+            echo "Add more tests to improve coverage"
+            echo "See docs/TESTING.md for testing guidelines"
+            rm -rf "$DERIVED_DATA_PATH"
+            exit 1
+        else
+            echo -e "${GREEN}✓ Code coverage is ${COVERAGE}% (target: 70%)${NC}"
+        fi
+    else
+        echo -e "${YELLOW}⚠️  Could not determine code coverage${NC}"
+    fi
+else
+    echo -e "${YELLOW}⚠️  No test results found${NC}"
+fi
+
+# Clean up
+rm -rf "$DERIVED_DATA_PATH"
+
+# 6. Check commit message format
+echo ""
+echo "💬 Commit message format will be validated..."
+echo "Remember to use conventional commit format:"
+echo "  feat(scope): description"
+echo "  fix(scope): description"
+echo "  docs: description"
+
+echo ""
+echo -e "${GREEN}✅ All pre-commit checks passed!${NC}"
+echo "Proceeding with commit..."
+
+exit 0

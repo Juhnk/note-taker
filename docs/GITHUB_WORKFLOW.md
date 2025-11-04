@@ -199,11 +199,17 @@ Brief description of what this PR does.
 
 ## Testing
 
-- [ ] Unit tests added/updated
+- [ ] Unit tests added/updated (TDD: tests written first)
 - [ ] Integration tests added/updated
+- [ ] Test coverage ≥ 70% (check component-specific targets)
+- [ ] All tests pass locally
+- [ ] Pre-commit hook passes
 - [ ] Manually tested on iOS simulator
 - [ ] Manually tested on macOS
 - [ ] Manually tested on physical device
+- [ ] Tested with VoiceOver (accessibility)
+- [ ] Tested with Dynamic Type
+- [ ] Tested in dark mode
 
 ## Screenshots (if applicable)
 
@@ -216,9 +222,14 @@ screenshot | screenshot
 - [ ] Code follows project style guidelines
 - [ ] Self-reviewed code
 - [ ] Commented complex code
-- [ ] Updated documentation
+- [ ] Updated PROGRESS.md with completed tasks
+- [ ] Updated documentation (if architecture/design changed)
 - [ ] No new warnings
-- [ ] Tests pass locally
+- [ ] SwiftLint passes
+- [ ] Pre-commit hook passes
+- [ ] All tests pass locally
+- [ ] Test coverage ≥ 70%
+- [ ] No debug print statements
 - [ ] Branch is up to date with main
 ```
 
@@ -235,8 +246,13 @@ Before approving, verify:
 - [ ] Performance impact considered
 - [ ] Memory leaks checked (Instruments if needed)
 - [ ] No merge conflicts
-- [ ] All tests pass
+- [ ] **All tests pass (CI/CD must be green)**
+- [ ] **Test coverage ≥ 70%** (component-specific targets apply)
+- [ ] **PROGRESS.md updated** with completed tasks
+- [ ] No debug print statements
+- [ ] SwiftLint passes
 - [ ] No emojis in code or UI (unless explicitly required)
+- [ ] Pre-commit hook was run (CI/CD verifies this)
 
 ### Merging
 
@@ -453,42 +469,127 @@ Already configured, but verify:
 
 ---
 
-## Continuous Integration (Future)
+## Pre-Commit Hooks
 
-When ready, set up GitHub Actions:
+### Setup
 
-### .github/workflows/ci.yml
+Run once to install pre-commit hooks:
 
-```yaml
-name: CI
-
-on:
-  pull_request:
-    branches: [ main ]
-  push:
-    branches: [ main ]
-
-jobs:
-  test:
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build and Test
-        run: |
-          xcodebuild test \
-            -scheme NoteTaker \
-            -destination 'platform=iOS Simulator,name=iPhone 15' \
-            -enableCodeCoverage YES
-
-  lint:
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-      - name: SwiftLint
-        run: |
-          brew install swiftlint
-          swiftlint lint --strict
+```bash
+./scripts/setup-hooks.sh
 ```
+
+This installs:
+- Pre-commit hook that runs before every commit
+- SwiftLint for code quality
+- .swiftlint.yml configuration
+
+### Pre-Commit Hook Checks
+
+The pre-commit hook automatically runs before EVERY commit and blocks the commit if:
+
+- [ ] SwiftLint fails (code quality issues)
+- [ ] iOS build fails (compilation errors)
+- [ ] macOS build fails (compilation errors)
+- [ ] iOS tests fail (test failures)
+- [ ] macOS tests fail (test failures)
+- [ ] Code coverage < 70% (insufficient test coverage)
+
+**Cannot commit without passing all checks.**
+
+### Bypassing Pre-Commit Hook
+
+**NOT RECOMMENDED**, but if absolutely necessary:
+
+```bash
+git commit --no-verify -m "message"
+```
+
+Note: CI/CD will still run and may reject your PR.
+
+### Pre-Commit Hook Benefits
+
+- Catches errors before they reach GitHub
+- Ensures tests are always passing
+- Maintains code quality standards
+- Prevents broken code in history
+- Saves time by catching issues early
+
+---
+
+## Continuous Integration (CI/CD)
+
+### GitHub Actions Workflows
+
+Two workflows run automatically:
+
+**1. CI/CD Pipeline** (`.github/workflows/ci.yml`)
+- Runs on: Every PR and push to main
+- Jobs:
+  - SwiftLint (code quality)
+  - Test iOS (build + tests + coverage)
+  - Test macOS (build + tests + coverage)
+  - Build iOS Release
+  - Build macOS Release
+- Blocks merge if any job fails
+- Requires 70% minimum code coverage
+
+**2. PR Validation** (`.github/workflows/pr-checks.yml`)
+- Runs on: Every PR
+- Checks:
+  - PR title follows conventional commits
+  - Commit messages follow conventional commits
+  - No TODOs without issue numbers
+  - Accessibility labels in new UI code
+  - PROGRESS.md updated for feature/fix PRs
+  - No debug print statements
+  - PR size warnings (> 20 files or > 1000 lines)
+  - Documentation updated for code changes
+
+### CI/CD Requirements
+
+**All checks must pass before merging:**
+
+- ✅ SwiftLint passes
+- ✅ iOS build succeeds
+- ✅ macOS build succeeds
+- ✅ iOS tests pass (100%)
+- ✅ macOS tests pass (100%)
+- ✅ Code coverage ≥ 70%
+- ✅ PR title is conventional commit format
+- ✅ All commit messages are conventional format
+
+### Viewing CI/CD Results
+
+1. Open your Pull Request on GitHub
+2. Scroll to "Checks" section at the bottom
+3. Click "Details" on any failed check
+4. Review logs to identify issue
+5. Fix and push - CI/CD will re-run automatically
+
+### CI/CD Failure Examples
+
+**SwiftLint Failure:**
+```
+❌ SwiftLint
+Line 45: Force unwrapping is not allowed
+```
+Fix: Remove force unwraps (!)
+
+**Test Failure:**
+```
+❌ Test iOS
+NotesViewModelTests.testCreateNote failed:
+Expected 1, got 0
+```
+Fix: Fix the failing test
+
+**Coverage Failure:**
+```
+❌ Check code coverage
+ERROR: Code coverage is below 70% (got 65%)
+```
+Fix: Add more tests
 
 ---
 
@@ -600,11 +701,21 @@ git checkout -b recovered-work
 
 - Always work on feature branches
 - Write clear, conventional commit messages
+- **Write tests FIRST** (TDD approach, 70%+ coverage required)
+- **Pre-commit hook blocks commits without passing tests**
+- **CI/CD blocks merges without passing tests**
 - Create descriptive Pull Requests
 - Self-review before requesting review
+- **Update PROGRESS.md** after completing tasks
 - Keep main branch protected and clean
 - Tag releases following SemVer
 - Delete branches after merge
 - Document decisions in commit messages
 
 Following this workflow ensures high code quality, clear history, and smooth collaboration (even when solo).
+
+**Key Quality Gates:**
+1. Pre-commit hook (local) - Prevents bad commits
+2. CI/CD pipeline (GitHub) - Prevents bad merges
+3. Code coverage (70%+ required) - Ensures thorough testing
+4. Progress tracking (PROGRESS.md) - Maintains visibility

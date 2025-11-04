@@ -1,0 +1,202 @@
+name: PR Validation
+
+on:
+  pull_request:
+    types: [opened, synchronize, edited]
+
+jobs:
+  validate-pr:
+    name: Validate PR Requirements
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate PR title follows conventional commits
+        run: |
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          echo "PR Title: $PR_TITLE"
+
+          # Check if PR title follows conventional commit format
+          if ! echo "$PR_TITLE" | grep -qE '^(feat|fix|docs|style|refactor|perf|test|chore|build|ci)(\(.+\))?: .+'; then
+            echo "ERROR: PR title must follow conventional commit format"
+            echo "Examples:"
+            echo "  feat(editor): add bold formatting"
+            echo "  fix(sync): resolve duplicate notes"
+            echo "  docs: update architecture guide"
+            exit 1
+          fi
+          echo "✓ PR title follows conventional commit format"
+
+      - name: Check for TODOs without issue numbers
+        run: |
+          # Find TODO/FIXME comments without issue references
+          if git diff origin/main...HEAD | grep -i "TODO\|FIXME" | grep -v "#[0-9]"; then
+            echo "WARNING: Found TODO/FIXME comments without issue numbers"
+            echo "Please reference an issue number like: TODO(#123): description"
+            # This is a warning, not a failure
+          else
+            echo "✓ No TODOs without issue numbers"
+          fi
+
+      - name: Check for accessibility labels in new UI code
+        run: |
+          # Check if new SwiftUI views have accessibility labels
+          NEW_UI_FILES=$(git diff --name-only origin/main...HEAD | grep "Views/.*\.swift" || true)
+
+          if [ -n "$NEW_UI_FILES" ]; then
+            echo "Checking accessibility in new UI files:"
+            echo "$NEW_UI_FILES"
+
+            for file in $NEW_UI_FILES; do
+              if [ -f "$file" ]; then
+                # Check if file contains View declarations
+                if grep -q "struct.*:.*View" "$file"; then
+                  # Check if it has accessibility labels
+                  if ! grep -q "accessibilityLabel\|accessibilityHint\|accessibilityValue" "$file"; then
+                    echo "WARNING: $file may be missing accessibility labels"
+                    echo "Please add .accessibilityLabel() to interactive elements"
+                  fi
+                fi
+              fi
+            done
+          fi
+          echo "✓ Accessibility check complete"
+
+      - name: Verify PROGRESS.md updated for feature changes
+        run: |
+          # Check if this is a feature or fix PR
+          PR_TITLE="${{ github.event.pull_request.title }}"
+
+          if echo "$PR_TITLE" | grep -qE '^(feat|fix)'; then
+            # Check if PROGRESS.md was modified
+            if ! git diff --name-only origin/main...HEAD | grep -q "PROGRESS.md"; then
+              echo "WARNING: This appears to be a feature/fix PR but PROGRESS.md wasn't updated"
+              echo "Please update PROGRESS.md to track your changes"
+              # This is a warning, not a failure
+            else
+              echo "✓ PROGRESS.md was updated"
+            fi
+          else
+            echo "✓ Not a feature/fix PR, PROGRESS.md update not required"
+          fi
+
+      - name: Check for large commits
+        run: |
+          # Warn if commits are too large (more than 500 lines changed)
+          COMMITS=$(git log origin/main..HEAD --oneline | cut -d' ' -f1)
+
+          for commit in $COMMITS; do
+            lines_changed=$(git diff --shortstat $commit^..$commit | grep -oE '[0-9]+ insertions|[0-9]+ deletions' | grep -oE '[0-9]+' | awk '{s+=$1} END {print s}')
+
+            if [ -n "$lines_changed" ] && [ "$lines_changed" -gt 500 ]; then
+              echo "WARNING: Commit $commit has $lines_changed lines changed"
+              echo "Consider breaking large commits into smaller, focused changes"
+              echo "See docs/DEVELOPMENT_CYCLES.md for cycle size guidelines"
+            fi
+          done
+          echo "✓ Commit size check complete"
+
+      - name: Verify no debug code in production files
+        run: |
+          # Check for common debug statements
+          if git diff origin/main...HEAD | grep -E "print\(|debugPrint\(|dump\(|NSLog" | grep "^\+"; then
+            echo "WARNING: Found debug print statements in new code"
+            echo "Please remove debug prints before merging"
+            echo "Use proper logging instead if needed"
+            # This is a warning for now
+          else
+            echo "✓ No debug print statements found"
+          fi
+
+      - name: Check PR size
+        run: |
+          FILES_CHANGED=$(git diff --name-only origin/main...HEAD | wc -l)
+          LINES_CHANGED=$(git diff origin/main...HEAD --shortstat | grep -oE '[0-9]+ insertions|[0-9]+ deletions' | grep -oE '[0-9]+' | awk '{s+=$1} END {print s}')
+
+          echo "Files changed: $FILES_CHANGED"
+          echo "Lines changed: $LINES_CHANGED"
+
+          if [ "$FILES_CHANGED" -gt 20 ]; then
+            echo "WARNING: This PR modifies $FILES_CHANGED files"
+            echo "Consider breaking it into smaller PRs for easier review"
+          fi
+
+          if [ -n "$LINES_CHANGED" ] && [ "$LINES_CHANGED" -gt 1000 ]; then
+            echo "WARNING: This PR has $LINES_CHANGED lines changed"
+            echo "Large PRs are harder to review. See docs/DEVELOPMENT_CYCLES.md"
+          fi
+
+          echo "✓ PR size check complete"
+
+  check-documentation:
+    name: Documentation Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if code changes require doc updates
+        run: |
+          # Get list of changed files
+          SWIFT_FILES=$(git diff --name-only origin/main...HEAD | grep "\.swift$" || true)
+          DOC_FILES=$(git diff --name-only origin/main...HEAD | grep "\.md$" || true)
+
+          # If Swift files changed but no doc files, warn
+          if [ -n "$SWIFT_FILES" ] && [ -z "$DOC_FILES" ]; then
+            PR_TITLE="${{ github.event.pull_request.title }}"
+
+            # If it's a feature, docs should probably be updated
+            if echo "$PR_TITLE" | grep -qE '^feat'; then
+              echo "WARNING: Feature PR with code changes but no documentation updates"
+              echo "Consider updating:"
+              echo "  - README.md (if user-facing changes)"
+              echo "  - docs/ARCHITECTURE.md (if architecture changed)"
+              echo "  - docs/DESIGN_SYSTEM.md (if UI patterns added)"
+              echo "  - PROGRESS.md (to track completion)"
+            fi
+          else
+            echo "✓ Documentation check passed"
+          fi
+
+  validate-commit-messages:
+    name: Validate Commit Messages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check all commit messages
+        run: |
+          echo "Validating commit messages..."
+          COMMITS=$(git log origin/main..HEAD --oneline)
+
+          if [ -z "$COMMITS" ]; then
+            echo "No commits to validate"
+            exit 0
+          fi
+
+          echo "$COMMITS" | while read commit; do
+            hash=$(echo "$commit" | cut -d' ' -f1)
+            message=$(git log --format=%s -n 1 $hash)
+
+            echo "Checking: $message"
+
+            # Check if commit message follows conventional format
+            if ! echo "$message" | grep -qE '^(feat|fix|docs|style|refactor|perf|test|chore|build|ci)(\(.+\))?: .+'; then
+              echo "ERROR: Commit message doesn't follow conventional format: $message"
+              echo "Format: <type>(<scope>): <subject>"
+              echo "Examples:"
+              echo "  feat(editor): add bold formatting"
+              echo "  fix(sync): resolve duplicate notes"
+              exit 1
+            fi
+          done
+
+          echo "✓ All commit messages follow conventional format"

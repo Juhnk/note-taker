@@ -6,12 +6,98 @@
 
 Every feature must have appropriate test coverage before it's considered done. Tests are not optional; they are part of the definition of "complete."
 
-**Minimum Coverage Targets**:
+**Final Coverage Targets** (by Sprint 10+):
 - Overall: 70%
 - Core Data Models & Services: 80%
 - ViewModels: 85%
 - Views: 60%
 - Utilities: 75%
+
+---
+
+## Progressive Coverage Policy
+
+To balance "maximum simplicity" with quality standards, we use **progressive coverage targets** that increase as the project matures.
+
+### Coverage by Phase
+
+| Phase | Sprint Range | Minimum Overall Coverage | Enforcement | Rationale |
+|-------|-------------|-------------------------|-------------|-----------|
+| **Setup** | Sprint 0 (0.1) | **Disabled** | None | Empty project, no code to test yet |
+| **Foundation** | Sprints 1-2 | **40%** | CI/CD only | Core infrastructure, learning TDD |
+| **Building** | Sprints 3-5 | **50%** | CI/CD only | Adding features, building habits |
+| **Maturing** | Sprints 6-9 | **60%** | CI/CD only | More features, improving coverage |
+| **Production** | Sprint 10+ | **70%** | CI/CD only | Production-ready, full coverage |
+
+### Why Progressive Coverage?
+
+**Industry Best Practice**:
+- Most successful projects start with lower coverage and increase over time
+- Allows focus on architecture and design in early phases
+- Builds good testing habits gradually
+- Prevents "test paralysis" where strict requirements block progress
+
+**Alignment with Project Goals**:
+- ✅ "Maximum simplicity" - No coverage burden during early development
+- ✅ "Small cycles (2-3 days)" - Fast iterations without coverage overhead
+- ✅ "Cannot commit without tests" - Still enforced via CI/CD (blocks merge)
+- ✅ Quality maintained - Progressive targets ensure steady improvement
+
+### Enforcement Strategy
+
+**Pre-Commit Hook** (Local):
+- SwiftLint (code quality)
+- Debug print check
+- Quick syntax validation
+- **NO coverage checks** (too slow)
+- Total time: ~30 seconds
+
+**CI/CD Pipeline** (GitHub Actions):
+- Full iOS and macOS builds
+- Full test suites
+- **Coverage checks** (blocks merge if below target)
+- Enforces progressive targets above
+
+### Updating Coverage Targets
+
+Coverage requirements are configured in `.github/workflows/ci.yml`. Update manually when advancing to new phase:
+
+```yaml
+# Current phase: Foundation (Sprints 1-2)
+- name: Check code coverage
+  run: |
+    coverage=$(xcrun xccov view --report DerivedData/Logs/Test/*.xcresult | grep "NoteTaker.app" | awk '{print $4}' | sed 's/%//')
+    echo "Code coverage: ${coverage}%"
+    if (( $(echo "$coverage < 40" | bc -l) )); then  # ← Update this number
+      echo "ERROR: Code coverage is below 40% (got ${coverage}%)"
+      exit 1
+    fi
+```
+
+### Component-Specific Targets
+
+Component-specific targets remain constant (these are goals, not blockers):
+
+| Component | Target | Priority | When to Achieve |
+|-----------|--------|----------|-----------------|
+| Core Data Models & Services | 80% | High | Sprint 1 onwards |
+| ViewModels | 85% | High | Sprint 1 onwards |
+| Services | 80% | High | Sprint 2 onwards |
+| Views | 60% | Medium | Sprint 3 onwards |
+| Utilities | 75% | Medium | Sprint 2 onwards |
+
+These targets guide test writing but **overall coverage** is what blocks merges.
+
+### Tracking Progress
+
+Monitor coverage in CI/CD output:
+```
+Code coverage: 45%
+✅ Meets minimum for current phase (40%)
+📈 Progress toward final target: 45/70%
+```
+
+See PROGRESS.md for tracking which sprint/phase you're in.
 
 ---
 

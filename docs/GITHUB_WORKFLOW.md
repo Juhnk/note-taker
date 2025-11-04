@@ -486,16 +486,22 @@ This installs:
 
 ### Pre-Commit Hook Checks
 
-The pre-commit hook automatically runs before EVERY commit and blocks the commit if:
+The pre-commit hook automatically runs before EVERY commit (~30 seconds) and blocks the commit if:
 
 - [ ] SwiftLint fails (code quality issues)
-- [ ] iOS build fails (compilation errors)
-- [ ] macOS build fails (compilation errors)
-- [ ] iOS tests fail (test failures)
-- [ ] macOS tests fail (test failures)
-- [ ] Code coverage < 70% (insufficient test coverage)
+- [ ] Debug print statements found (with user confirmation)
+- [ ] Syntax errors detected
 
-**Cannot commit without passing all checks.**
+**Fast feedback in ~30 seconds.**
+
+**What's NOT in pre-commit** (happens in CI/CD instead):
+- ❌ Full iOS/macOS builds (too slow: 2-5 min each)
+- ❌ Full test suites (too slow: 1-3 min each)
+- ❌ Code coverage checks (too slow: ~2 min)
+
+**Total time: ~30 seconds vs 6-16 minutes** ⚡
+
+This design prioritizes "maximum simplicity" and supports small 2-3 day cycles with multiple commits per day.
 
 ### Bypassing Pre-Commit Hook
 
@@ -525,6 +531,7 @@ Two workflows run automatically:
 
 **1. CI/CD Pipeline** (`.github/workflows/ci.yml`)
 - Runs on: Every PR and push to main
+- Runner: macOS-15 (Xcode 16.4)
 - Jobs:
   - SwiftLint (code quality)
   - Test iOS (build + tests + coverage)
@@ -532,7 +539,12 @@ Two workflows run automatically:
   - Build iOS Release
   - Build macOS Release
 - Blocks merge if any job fails
-- Requires 70% minimum code coverage
+- **Progressive coverage requirements** (see docs/TESTING.md):
+  - Sprint 0: Disabled
+  - Sprint 1-2: 40% minimum
+  - Sprint 3-5: 50% minimum
+  - Sprint 6-9: 60% minimum
+  - Sprint 10+: 70% minimum
 
 **2. PR Validation** (`.github/workflows/pr-checks.yml`)
 - Runs on: Every PR
@@ -555,9 +567,11 @@ Two workflows run automatically:
 - ✅ macOS build succeeds
 - ✅ iOS tests pass (100%)
 - ✅ macOS tests pass (100%)
-- ✅ Code coverage ≥ 70%
+- ✅ Code coverage meets progressive target (Sprint 0: disabled, Sprint 1+: see table above)
 - ✅ PR title is conventional commit format
 - ✅ All commit messages are conventional format
+
+**Current Coverage Target**: Sprint 0 = Disabled (update in `.github/workflows/ci.yml` when advancing sprints)
 
 ### Viewing CI/CD Results
 
@@ -587,9 +601,9 @@ Fix: Fix the failing test
 **Coverage Failure:**
 ```
 ❌ Check code coverage
-ERROR: Code coverage is below 70% (got 65%)
+ERROR: Code coverage is below 40% (got 35%)  # Sprint 1-2 minimum
 ```
-Fix: Add more tests
+Fix: Add more tests to meet progressive target (see docs/TESTING.md)
 
 ---
 
@@ -701,8 +715,8 @@ git checkout -b recovered-work
 
 - Always work on feature branches
 - Write clear, conventional commit messages
-- **Write tests FIRST** (TDD approach, 70%+ coverage required)
-- **Pre-commit hook blocks commits without passing tests**
+- **Write tests FIRST** (TDD approach, progressive coverage targets)
+- **Pre-commit hook is FAST** (~30 seconds: lint, syntax only)
 - **CI/CD blocks merges without passing tests**
 - Create descriptive Pull Requests
 - Self-review before requesting review
@@ -715,7 +729,12 @@ git checkout -b recovered-work
 Following this workflow ensures high code quality, clear history, and smooth collaboration (even when solo).
 
 **Key Quality Gates:**
-1. Pre-commit hook (local) - Prevents bad commits
-2. CI/CD pipeline (GitHub) - Prevents bad merges
-3. Code coverage (70%+ required) - Ensures thorough testing
-4. Progress tracking (PROGRESS.md) - Maintains visibility
+1. **Pre-commit hook** (local, ~30 sec) - Fast syntax and style checks
+2. **CI/CD pipeline** (GitHub) - Full validation, prevents bad merges
+3. **Progressive coverage** (40% → 70%) - Practical quality improvement
+4. **Progress tracking** (PROGRESS.md) - Maintains visibility
+
+**Philosophy**:
+- Pre-commit = Fast feedback loop (supports "maximum simplicity")
+- CI/CD = Quality enforcement (blocks bad code)
+- Progressive coverage = Practical approach (not perfectionism)

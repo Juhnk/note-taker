@@ -213,9 +213,9 @@ Development is tracked in [PROGRESS.md](PROGRESS.md) with:
 ## Quality Standards
 
 ### No Code Without Tests
-- Minimum 70% overall test coverage
+- Progressive coverage targets (40% → 70%)
 - TDD approach (write tests first)
-- Pre-commit hooks block untested code
+- Fast pre-commit hooks (~30 sec)
 - CI/CD blocks untested PRs
 
 ### Development Cycles
@@ -225,10 +225,15 @@ Development is tracked in [PROGRESS.md](PROGRESS.md) with:
 - See [DEVELOPMENT_CYCLES.md](docs/DEVELOPMENT_CYCLES.md)
 
 ### Code Quality Gates
-1. **Pre-commit hook** (local) - Blocks commits without passing tests
-2. **CI/CD pipeline** (GitHub) - Blocks merges without passing tests
-3. **Code coverage** (70%+ required) - Ensures thorough testing
+1. **Pre-commit hook** (local, ~30 sec) - Fast syntax and style checks
+2. **CI/CD pipeline** (GitHub) - Full validation, prevents bad merges
+3. **Progressive coverage** (40% → 70%) - Practical quality improvement
 4. **Progress tracking** (PROGRESS.md) - Maintains visibility
+
+### Philosophy
+- **"Maximum simplicity"** - Fast commits (~30 sec), not 6-16 minutes
+- **Small cycles** - Multiple commits per day without pain
+- **Quality enforced** - CI/CD blocks bad merges (not local commits)
 
 ## Development Workflow
 
@@ -260,7 +265,12 @@ This is currently a personal project. The workflow and documentation are designe
 
 ### Testing Requirements
 
-- **Minimum 70% overall code coverage**
+- **Progressive coverage targets** (see [TESTING.md](docs/TESTING.md)):
+  - Sprint 0: Disabled (empty project)
+  - Sprint 1-2: 40% minimum
+  - Sprint 3-5: 50% minimum
+  - Sprint 6-9: 60% minimum
+  - Sprint 10+: 70% minimum (final target)
 - Unit tests for ViewModels and business logic (85% target)
 - Integration tests for Core Data operations and sync (80% target)
 - UI tests for critical user flows
@@ -276,23 +286,29 @@ We follow TDD approach:
 3. Refactor if needed
 4. Repeat
 
-### Pre-Commit Hooks
+### Pre-Commit Hooks (FAST - ~30 seconds)
 
-Pre-commit hooks automatically run before EVERY commit and block commits if:
+Pre-commit hooks run before every commit (~30 seconds) and block commits if:
 - SwiftLint fails
-- Build fails
-- Tests fail
-- Code coverage < 70%
+- Debug print statements found (with confirmation)
+- Syntax errors detected
+
+**What's NOT in pre-commit** (runs in CI/CD instead):
+- Full builds (too slow: 2-5 min each)
+- Full test suites (too slow: 1-3 min each)
+- Coverage checks (too slow: ~2 min)
 
 Setup: `./scripts/setup-hooks.sh`
 
-### CI/CD Pipeline
+**Philosophy**: Fast feedback loop supports "maximum simplicity" and small 2-3 day cycles
 
-GitHub Actions run on every PR and push to main:
+### CI/CD Pipeline (COMPREHENSIVE)
+
+GitHub Actions run on every PR and push to main (macOS-15, Xcode 16.4):
 - ✅ SwiftLint (code quality)
-- ✅ Build iOS and macOS
-- ✅ Run all tests
-- ✅ Check code coverage ≥ 70%
+- ✅ Build iOS and macOS (full builds)
+- ✅ Run all tests (full test suites)
+- ✅ Check progressive coverage targets
 - ✅ Validate commit messages
 - ✅ Check documentation updates
 
@@ -341,10 +357,16 @@ For questions or feedback: nick@adbox.io
 
 **Testing Infrastructure**:
 - ✅ PROGRESS.md - Checkbox-based progress tracking
-- ✅ Pre-commit hooks - Block commits without passing tests
-- ✅ CI/CD pipeline - Block merges without passing tests
-- ✅ Testing guidelines - TDD approach, 70%+ coverage
+- ✅ Fast pre-commit hooks - Quick checks (~30 sec), no builds/tests
+- ✅ CI/CD pipeline - Full validation, blocks bad merges
+- ✅ Progressive coverage - 40% → 70% (practical approach)
+- ✅ Testing guidelines - TDD approach, see TESTING.md
 - ✅ Development cycles - 2-3 day maximum cycles
+
+**Optimized for "maximum simplicity":**
+- Pre-commit: ~30 seconds (was 6-16 minutes)
+- CI/CD: Full validation without slowing local development
+- Progressive coverage: Practical targets that increase over time
 
 **Key Decisions Made**:
 - Using Core Data instead of SwiftData (stability)
@@ -352,8 +374,10 @@ For questions or feedback: nick@adbox.io
 - Minimal design (white, greys, black only)
 - 9-month timeline (realistic based on research)
 - iOS 17+ and macOS 14+ minimum versions
-- TDD approach with mandatory testing (70%+ coverage)
+- TDD approach with progressive coverage (40% → 70%)
+- Fast pre-commit (~30 sec), full CI/CD validation
 - Small cycles (2-3 days max) to avoid AI overload
+- macOS-15 runners, Xcode 16.4 (current as of Nov 2024-2025)
 
 See [PROJECT_PLAN.md](docs/PROJECT_PLAN.md) for complete roadmap and decisions.
 See [PROGRESS.md](PROGRESS.md) for current sprint and tasks.

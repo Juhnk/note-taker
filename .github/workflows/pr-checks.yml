@@ -44,24 +44,26 @@ jobs:
       - name: Check for accessibility labels in new UI code
         run: |
           # Check if new SwiftUI views have accessibility labels
-          NEW_UI_FILES=$(git diff --name-only origin/main...HEAD | grep "Views/.*\.swift" || true)
+          if [ -d ".git" ]; then
+            NEW_UI_FILES=$(git diff --name-only origin/main...HEAD 2>/dev/null | grep "Views/.*\.swift" || true)
 
-          if [ -n "$NEW_UI_FILES" ]; then
-            echo "Checking accessibility in new UI files:"
-            echo "$NEW_UI_FILES"
+            if [ -n "$NEW_UI_FILES" ]; then
+              echo "Checking accessibility in new UI files:"
+              echo "$NEW_UI_FILES"
 
-            for file in $NEW_UI_FILES; do
-              if [ -f "$file" ]; then
-                # Check if file contains View declarations
-                if grep -q "struct.*:.*View" "$file"; then
-                  # Check if it has accessibility labels
-                  if ! grep -q "accessibilityLabel\|accessibilityHint\|accessibilityValue" "$file"; then
-                    echo "WARNING: $file may be missing accessibility labels"
-                    echo "Please add .accessibilityLabel() to interactive elements"
+              while IFS= read -r file; do
+                if [ -f "$file" ]; then
+                  # Check if file contains View declarations
+                  if grep -q "struct.*:.*View" "$file" 2>/dev/null; then
+                    # Check if it has accessibility labels
+                    if ! grep -q "accessibilityLabel\|accessibilityHint\|accessibilityValue" "$file" 2>/dev/null; then
+                      echo "WARNING: $file may be missing accessibility labels"
+                      echo "Please add .accessibilityLabel() to interactive elements"
+                    fi
                   fi
                 fi
-              fi
-            done
+              done <<< "$NEW_UI_FILES"
+            fi
           fi
           echo "✓ Accessibility check complete"
 
@@ -86,17 +88,23 @@ jobs:
       - name: Check for large commits
         run: |
           # Warn if commits are too large (more than 500 lines changed)
-          COMMITS=$(git log origin/main..HEAD --oneline | cut -d' ' -f1)
+          COMMITS=$(git log origin/main..HEAD --oneline 2>/dev/null | cut -d' ' -f1 || true)
 
-          for commit in $COMMITS; do
-            lines_changed=$(git diff --shortstat $commit^..$commit | grep -oE '[0-9]+ insertions|[0-9]+ deletions' | grep -oE '[0-9]+' | awk '{s+=$1} END {print s}')
+          if [ -n "$COMMITS" ]; then
+            while read -r commit; do
+              if [ -n "$commit" ]; then
+                # Get insertions and deletions separately, sum them
+                lines_changed=$(git diff --shortstat "$commit^..$commit" 2>/dev/null | \
+                  awk '{for(i=1;i<=NF;i++) if($i~/^[0-9]+$/) sum+=$i} END {print sum+0}')
 
-            if [ -n "$lines_changed" ] && [ "$lines_changed" -gt 500 ]; then
-              echo "WARNING: Commit $commit has $lines_changed lines changed"
-              echo "Consider breaking large commits into smaller, focused changes"
-              echo "See docs/DEVELOPMENT_CYCLES.md for cycle size guidelines"
-            fi
-          done
+                if [ "$lines_changed" -gt 500 ] 2>/dev/null; then
+                  echo "WARNING: Commit $commit has $lines_changed lines changed"
+                  echo "Consider breaking large commits into smaller, focused changes"
+                  echo "See docs/DEVELOPMENT_CYCLES.md for cycle size guidelines"
+                fi
+              fi
+            done <<< "$COMMITS"
+          fi
           echo "✓ Commit size check complete"
 
       - name: Verify no debug code in production files
@@ -113,18 +121,19 @@ jobs:
 
       - name: Check PR size
         run: |
-          FILES_CHANGED=$(git diff --name-only origin/main...HEAD | wc -l)
-          LINES_CHANGED=$(git diff origin/main...HEAD --shortstat | grep -oE '[0-9]+ insertions|[0-9]+ deletions' | grep -oE '[0-9]+' | awk '{s+=$1} END {print s}')
+          FILES_CHANGED=$(git diff --name-only origin/main...HEAD 2>/dev/null | wc -l || echo "0")
+          LINES_CHANGED=$(git diff origin/main...HEAD --shortstat 2>/dev/null | \
+            awk '{for(i=1;i<=NF;i++) if($i~/^[0-9]+$/) sum+=$i} END {print sum+0}')
 
           echo "Files changed: $FILES_CHANGED"
-          echo "Lines changed: $LINES_CHANGED"
+          echo "Lines changed: ${LINES_CHANGED:-0}"
 
-          if [ "$FILES_CHANGED" -gt 20 ]; then
+          if [ "$FILES_CHANGED" -gt 20 ] 2>/dev/null; then
             echo "WARNING: This PR modifies $FILES_CHANGED files"
             echo "Consider breaking it into smaller PRs for easier review"
           fi
 
-          if [ -n "$LINES_CHANGED" ] && [ "$LINES_CHANGED" -gt 1000 ]; then
+          if [ "$LINES_CHANGED" -gt 1000 ] 2>/dev/null; then
             echo "WARNING: This PR has $LINES_CHANGED lines changed"
             echo "Large PRs are harder to review. See docs/DEVELOPMENT_CYCLES.md"
           fi

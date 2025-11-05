@@ -98,12 +98,23 @@
   - Provided step-by-step activation instructions
   - Documented current status (configured but not active)
 
+**Additional Work Completed**:
+- Generated manual Core Data entity classes (8 files total):
+  - Note+CoreDataClass.swift & Note+CoreDataProperties.swift
+  - Folder+CoreDataClass.swift & Folder+CoreDataProperties.swift
+  - Tag+CoreDataClass.swift & Tag+CoreDataProperties.swift
+  - Attachment+CoreDataClass.swift & Attachment+CoreDataProperties.swift
+- Updated Core Data model to use manual code generation
+- Files automatically integrated with Xcode project
+- Verified builds with entity classes: iOS ✅ | macOS ✅
+
 **Notes**:
 - CloudKit is fully configured in code but not active
 - Entitlements file exists and is ready
 - Project builds successfully without paid Apple Developer account
 - CloudKit sync will work immediately after paid account is added (uncomment entitlements)
 - All code is "future-ready" for CloudKit activation
+- Core Data entity classes generated automatically (no manual Xcode work required)
 
 **Important Discovery**:
 - Free "Personal Team" Apple Developer accounts DO NOT support:

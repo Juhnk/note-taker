@@ -107,41 +107,85 @@ NoteTaker/
 ### Prerequisites
 
 - macOS 14 Sonoma or later
-- Xcode 15 or later
-- Apple Developer account ($99/year for App Store)
-- iOS device running iOS 17+ for testing
+- Xcode 15 or later (currently using Xcode 26.1 beta)
+- **Apple Developer Program** ($99/year) - **REQUIRED for CloudKit sync**
+- iOS device running iOS 17+ for testing CloudKit sync
+
+### Important: CloudKit Requires Paid Developer Account
+
+**Current Status**: CloudKit is **configured but not active**. The project is ready for CloudKit sync but requires a paid Apple Developer Program membership to function.
+
+**Free "Personal Team" accounts DO NOT support**:
+- iCloud/CloudKit capabilities
+- Push Notifications (needed for CloudKit sync)
+- CloudKit container access
+
+**What Works Now** (Free Account):
+- ✅ Local Core Data storage
+- ✅ Full CRUD operations
+- ✅ App builds and runs
+- ✅ All UI and features (except sync)
+
+**What Requires Paid Account** ($99/year):
+- ☁️ CloudKit sync between devices
+- ☁️ iCloud backup
+- ☁️ Remote change notifications
+- 📱 App Store distribution
 
 ### Setup Instructions
 
-1. **Create Xcode project**
-   - Open Xcode
-   - File → New → Project
-   - Choose "Multiplatform > App"
-   - Product Name: `NoteTaker`
-   - Organization Identifier: `com.yourname.notetaker`
-   - Interface: SwiftUI
-   - Language: Swift
-   - Storage: **Core Data** (Important!)
-   - Include Tests: Yes
-   - Save in: `/Users/juhnk/repos/notes/note-taker`
+**Project is already created!** Follow these steps to enable CloudKit sync:
 
-2. **Enable CloudKit**
-   - Select project target in Xcode
-   - Go to "Signing & Capabilities"
-   - Click "+ Capability"
-   - Add "iCloud"
-   - Check "CloudKit"
-   - Create container: `iCloud.com.yourname.NoteTaker`
+1. **Purchase Apple Developer Program** ($99/year)
+   - Go to https://developer.apple.com/programs/enroll/
+   - Complete enrollment
+   - This usually takes 24-48 hours to process
 
-3. **Configure Core Data**
-   - Update `PersistenceController` to use `NSPersistentCloudKitContainer`
-   - Enable persistent history tracking
-   - Set up merge policies
-   - See `docs/ARCHITECTURE.md` for complete setup
+2. **Sign into Xcode with Paid Account**
+   - Xcode → Settings → Accounts
+   - Add your Apple ID (must be enrolled in Developer Program)
+   - Sign out of free "Personal Team" account first
 
-4. **Run the app**
-   - Select iOS or macOS target
+3. **Enable CloudKit in Project**
+   - Open `NoteTaker.xcodeproj`
+   - Edit `project.pbxproj` and uncomment these lines (around line 390):
+     ```
+     CODE_SIGN_ENTITLEMENTS = NoteTaker/NoteTaker.entitlements;
+     ```
+   - Or in Xcode UI: Signing & Capabilities → Add "iCloud" → Check "CloudKit"
+
+4. **Build and Test**
+   - Build project (should succeed now with entitlements)
+   - Run on physical iOS device (CloudKit doesn't work in Simulator)
+   - Sign into iCloud on device
+   - CloudKit sync will start automatically
+
+**Already Configured**:
+- ✅ Core Data model with 4 entities (Note, Folder, Tag, Attachment)
+- ✅ `NSPersistentCloudKitContainer` with full CloudKit configuration
+- ✅ Entitlements file: `NoteTaker/NoteTaker.entitlements`
+- ✅ CloudKit container ID: `iCloud.com.juhnk.NoteTaker`
+- ✅ Persistent history tracking enabled
+- ✅ Remote change notifications configured
+- ✅ Merge policy set
+
+### Running the App (Local-Only Mode)
+
+Without paid account, the app works in local-only mode:
+
+1. **Select target**
+   - iOS or macOS target in Xcode
+
+2. **Run app**
    - Press Cmd+R to build and run
+   - App functions normally with local Core Data
+   - Notes are saved locally, no sync
+
+3. **Test CloudKit** (requires paid account + physical device)
+   - After enabling entitlements
+   - Run on physical device
+   - Create notes
+   - Check iCloud.com to see synced data
 
 ## Architecture
 

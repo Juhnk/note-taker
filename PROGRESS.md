@@ -59,6 +59,60 @@
 - iOS 26.1 simulators installed and working
 - Pre-commit hook runs in ~30 seconds (fast feedback loop)
 
+### Sprint 0.2: CloudKit Configuration ✅
+- [x] Create NoteTaker.entitlements file
+- [x] Configure iCloud services capability
+- [x] Configure CloudKit container identifier
+- [x] Configure push notifications for CloudKit
+- [x] Update Persistence.swift with full CloudKit setup
+- [x] Enable persistent history tracking
+- [x] Enable remote change notifications
+- [x] Configure merge policies for conflict resolution
+- [x] Add remote change observer
+- [x] Update project.pbxproj with entitlements reference
+- [x] Verify builds work on iOS and macOS (without paid account)
+- [x] Update README.md with CloudKit requirements documentation
+
+**Estimated Time**: 1 day
+**Actual Time**: 1 day
+**Status**: ✅ COMPLETED (2025-11-05)
+
+**Completed Tasks**:
+- Created NoteTaker.entitlements with full CloudKit configuration:
+  - iCloud services: CloudKit
+  - Container ID: iCloud.com.juhnk.NoteTaker
+  - Development environment
+  - Push notifications for sync
+  - macOS sandbox with file access
+- Updated Persistence.swift with comprehensive CloudKit setup:
+  - NSPersistentHistoryTracking enabled
+  - Remote change notifications enabled
+  - CloudKit container options configured
+  - Merge policy: NSMergeByPropertyObjectTrumpMergePolicy
+  - NotificationCenter observer for remote changes
+- Updated project.pbxproj with entitlements link (commented out for free account)
+- Verified builds succeed on both iOS and macOS without paid account
+- Updated README.md with detailed CloudKit requirements:
+  - Documented paid Apple Developer Program requirement ($99/year)
+  - Explained what works with free account vs paid account
+  - Provided step-by-step activation instructions
+  - Documented current status (configured but not active)
+
+**Notes**:
+- CloudKit is fully configured in code but not active
+- Entitlements file exists and is ready
+- Project builds successfully without paid Apple Developer account
+- CloudKit sync will work immediately after paid account is added (uncomment entitlements)
+- All code is "future-ready" for CloudKit activation
+
+**Important Discovery**:
+- Free "Personal Team" Apple Developer accounts DO NOT support:
+  - iCloud/CloudKit capabilities
+  - Push Notifications
+  - CloudKit container access
+- Paid Apple Developer Program ($99/year) required for CloudKit functionality
+- This is a documented limitation, not a bug or configuration issue
+
 ---
 
 ## Phase 1: MVP (Months 1-3)

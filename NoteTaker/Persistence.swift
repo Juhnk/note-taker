@@ -43,6 +43,27 @@ struct PersistenceController {
             if let description = container.persistentStoreDescriptions.first {
                 description.url = URL(fileURLWithPath: "/dev/null")
             }
+        } else {
+            // Configure CloudKit sync
+            guard let description = container.persistentStoreDescriptions.first else {
+                fatalError("Failed to retrieve persistent store description")
+            }
+
+            // Enable persistent history tracking for CloudKit
+            description.setOption(true as NSNumber,
+                                forKey: NSPersistentHistoryTrackingKey)
+
+            // Enable remote change notifications
+            description.setOption(true as NSNumber,
+                                forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)
+
+            // CloudKit container options
+            // Note: This requires a paid Apple Developer Program account ($99/year)
+            // Container ID must match the one in NoteTaker.entitlements
+            let cloudKitContainerOptions = NSPersistentCloudKitContainerOptions(
+                containerIdentifier: "iCloud.com.juhnk.NoteTaker"
+            )
+            description.cloudKitContainerOptions = cloudKitContainerOptions
         }
 
         container.loadPersistentStores(completionHandler: { (_, error) in
@@ -53,12 +74,28 @@ struct PersistenceController {
                  * The persistent store is not accessible, due to permissions or data protection when the device is locked.
                  * The device is out of space.
                  * The store could not be migrated to the current model version.
+                 * CloudKit is not configured (requires paid Apple Developer account).
                  Check the error message to determine what the actual problem was.
                  */
                 fatalError("Unresolved error \(error), \(error.userInfo)")
             }
         })
 
+        // Automatically merge changes from parent (CloudKit sync)
         container.viewContext.automaticallyMergesChangesFromParent = true
+
+        // Merge policy: local changes win in conflicts
+        container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+
+        // Set up notifications for remote changes from CloudKit
+        NotificationCenter.default.addObserver(
+            forName: .NSPersistentStoreRemoteChange,
+            object: container.persistentStoreCoordinator,
+            queue: .main
+        ) { _ in
+            // Handle remote changes if needed
+            // The viewContext will automatically merge changes due to automaticallyMergesChangesFromParent
+            print("Remote CloudKit changes detected and merged")
+        }
     }
 }

@@ -50,9 +50,8 @@ jobs:
         run: |
           xcodebuild clean test \
             -scheme NoteTaker \
-            -testPlan NoteTaker \
             -sdk iphonesimulator \
-            -destination 'platform=iOS Simulator,name=Any iOS Simulator Device' \
+            -destination 'platform=iOS Simulator,name=iPhone 15 Pro' \
             -enableCodeCoverage YES \
             -derivedDataPath DerivedData \
             CODE_SIGN_IDENTITY="" \
@@ -116,7 +115,6 @@ jobs:
         run: |
           xcodebuild clean test \
             -scheme NoteTaker \
-            -testPlan NoteTaker \
             -sdk macosx \
             -destination 'platform=macOS' \
             -enableCodeCoverage YES \

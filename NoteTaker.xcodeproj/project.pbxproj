@@ -14,19 +14,11 @@
 			remoteGlobalIDString = B14157752EBAA10B00EA4279;
 			remoteInfo = NoteTaker;
 		};
-		B14157932EBAA10C00EA4279 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = B141576E2EBAA10B00EA4279 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = B14157752EBAA10B00EA4279;
-			remoteInfo = NoteTaker;
-		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		B14157762EBAA10C00EA4279 /* NoteTaker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NoteTaker.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B14157882EBAA10C00EA4279 /* NoteTakerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NoteTakerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		B14157922EBAA10C00EA4279 /* NoteTakerUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NoteTakerUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -38,11 +30,6 @@
 		B141578B2EBAA10C00EA4279 /* NoteTakerTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = NoteTakerTests;
-			sourceTree = "<group>";
-		};
-		B14157952EBAA10C00EA4279 /* NoteTakerUITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = NoteTakerUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -62,13 +49,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		B141578F2EBAA10C00EA4279 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -77,7 +57,6 @@
 			children = (
 				B14157782EBAA10C00EA4279 /* NoteTaker */,
 				B141578B2EBAA10C00EA4279 /* NoteTakerTests */,
-				B14157952EBAA10C00EA4279 /* NoteTakerUITests */,
 				B14157772EBAA10C00EA4279 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -87,7 +66,6 @@
 			children = (
 				B14157762EBAA10C00EA4279 /* NoteTaker.app */,
 				B14157882EBAA10C00EA4279 /* NoteTakerTests.xctest */,
-				B14157922EBAA10C00EA4279 /* NoteTakerUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -140,29 +118,6 @@
 			productReference = B14157882EBAA10C00EA4279 /* NoteTakerTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		B14157912EBAA10C00EA4279 /* NoteTakerUITests */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = B14157A22EBAA10C00EA4279 /* Build configuration list for PBXNativeTarget "NoteTakerUITests" */;
-			buildPhases = (
-				B141578E2EBAA10C00EA4279 /* Sources */,
-				B141578F2EBAA10C00EA4279 /* Frameworks */,
-				B14157902EBAA10C00EA4279 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				B14157942EBAA10C00EA4279 /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				B14157952EBAA10C00EA4279 /* NoteTakerUITests */,
-			);
-			name = NoteTakerUITests;
-			packageProductDependencies = (
-			);
-			productName = NoteTakerUITests;
-			productReference = B14157922EBAA10C00EA4279 /* NoteTakerUITests.xctest */;
-			productType = "com.apple.product-type.bundle.ui-testing";
-		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -177,10 +132,6 @@
 						CreatedOnToolsVersion = 26.1;
 					};
 					B14157872EBAA10C00EA4279 = {
-						CreatedOnToolsVersion = 26.1;
-						TestTargetID = B14157752EBAA10B00EA4279;
-					};
-					B14157912EBAA10C00EA4279 = {
 						CreatedOnToolsVersion = 26.1;
 						TestTargetID = B14157752EBAA10B00EA4279;
 					};
@@ -202,7 +153,6 @@
 			targets = (
 				B14157752EBAA10B00EA4279 /* NoteTaker */,
 				B14157872EBAA10C00EA4279 /* NoteTakerTests */,
-				B14157912EBAA10C00EA4279 /* NoteTakerUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -216,13 +166,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		B14157862EBAA10C00EA4279 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		B14157902EBAA10C00EA4279 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -246,13 +189,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		B141578E2EBAA10C00EA4279 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -260,11 +196,6 @@
 			isa = PBXTargetDependency;
 			target = B14157752EBAA10B00EA4279 /* NoteTaker */;
 			targetProxy = B14157892EBAA10C00EA4279 /* PBXContainerItemProxy */;
-		};
-		B14157942EBAA10C00EA4279 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = B14157752EBAA10B00EA4279 /* NoteTaker */;
-			targetProxy = B14157932EBAA10C00EA4279 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -537,62 +468,6 @@
 			};
 			name = Release;
 		};
-		B14157A32EBAA10C00EA4279 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				// CODE_SIGN_ENTITLEMENTS = NoteTaker/NoteTaker.entitlements;
-				// NOTE: Uncomment above line after adding paid Apple Developer account
-				// Free "Personal Team" accounts do not support iCloud/CloudKit capabilities
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = F77DW39S9P;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.juhnk.NoteTakerUITests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = auto;
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
-				TEST_TARGET_NAME = NoteTaker;
-				XROS_DEPLOYMENT_TARGET = 1.0;
-			};
-			name = Debug;
-		};
-		B14157A42EBAA10C00EA4279 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				// CODE_SIGN_ENTITLEMENTS = NoteTaker/NoteTaker.entitlements;
-				// NOTE: Uncomment above line after adding paid Apple Developer account
-				// Free "Personal Team" accounts do not support iCloud/CloudKit capabilities
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = F77DW39S9P;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.juhnk.NoteTakerUITests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = auto;
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
-				TEST_TARGET_NAME = NoteTaker;
-				XROS_DEPLOYMENT_TARGET = 1.0;
-			};
-			name = Release;
-		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -619,15 +494,6 @@
 			buildConfigurations = (
 				B14157A02EBAA10C00EA4279 /* Debug */,
 				B14157A12EBAA10C00EA4279 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		B14157A22EBAA10C00EA4279 /* Build configuration list for PBXNativeTarget "NoteTakerUITests" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				B14157A32EBAA10C00EA4279 /* Debug */,
-				B14157A42EBAA10C00EA4279 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

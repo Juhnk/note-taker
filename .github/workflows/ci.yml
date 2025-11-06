@@ -48,11 +48,12 @@ jobs:
       - name: Build and test iOS
         if: steps.check_project.outputs.exists == 'true'
         run: |
-          xcodebuild clean test \
-            -scheme NoteTaker \
+          xcodebuild clean build test \
+            -project NoteTaker.xcodeproj \
+            -target NoteTaker \
+            -target NoteTakerTests \
             -sdk iphonesimulator \
-            -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
-            -skip-testing:NoteTakerUITests \
+            -destination 'platform=iOS Simulator,name=Any iOS Simulator Device' \
             -enableCodeCoverage YES \
             -derivedDataPath DerivedData \
             CODE_SIGN_IDENTITY="" \
@@ -114,11 +115,12 @@ jobs:
       - name: Build and test macOS
         if: steps.check_project.outputs.exists == 'true'
         run: |
-          xcodebuild clean test \
-            -scheme NoteTaker \
+          xcodebuild clean build test \
+            -project NoteTaker.xcodeproj \
+            -target NoteTaker \
+            -target NoteTakerTests \
             -sdk macosx \
             -destination 'platform=macOS' \
-            -skip-testing:NoteTakerUITests \
             -enableCodeCoverage YES \
             -derivedDataPath DerivedData \
             CODE_SIGN_IDENTITY="" \

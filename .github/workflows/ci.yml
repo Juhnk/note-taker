@@ -51,7 +51,7 @@ jobs:
           xcodebuild clean test \
             -scheme NoteTaker \
             -sdk iphonesimulator \
-            -destination 'platform=iOS Simulator,name=iPhone 15 Pro' \
+            -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
             -enableCodeCoverage YES \
             -derivedDataPath DerivedData \
             CODE_SIGN_IDENTITY="" \
@@ -70,18 +70,16 @@ jobs:
           echo "Code coverage: ${coverage}%"
 
           # Progressive coverage policy (see docs/TESTING.md)
-          # Current phase: Sprint 0 - Coverage disabled
+          # Current phase: Sprint 1 - 40% minimum coverage
           # Sprint 1-2: 40%, Sprint 3-5: 50%, Sprint 6-9: 60%, Sprint 10+: 70%
 
-          # Uncomment when Sprint 1 starts:
-          # MIN_COVERAGE=40
-          # if (( $(echo "$coverage < $MIN_COVERAGE" | bc -l) )); then
-          #   echo "ERROR: Code coverage is below ${MIN_COVERAGE}% (got ${coverage}%)"
-          #   exit 1
-          # fi
+          MIN_COVERAGE=40
+          if (( $(echo "$coverage < $MIN_COVERAGE" | bc -l) )); then
+            echo "ERROR: Code coverage is below ${MIN_COVERAGE}% (got ${coverage}%)"
+            exit 1
+          fi
 
-          echo "✅ Coverage check disabled for Sprint 0 (empty project)"
-          echo "Will enforce 40% minimum starting Sprint 1"
+          echo "✅ Coverage check passed: ${coverage}% (minimum: ${MIN_COVERAGE}%)"
 
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4
@@ -137,18 +135,16 @@ jobs:
           echo "Code coverage: ${coverage}%"
 
           # Progressive coverage policy (see docs/TESTING.md)
-          # Current phase: Sprint 0 - Coverage disabled
+          # Current phase: Sprint 1 - 40% minimum coverage
           # Sprint 1-2: 40%, Sprint 3-5: 50%, Sprint 6-9: 60%, Sprint 10+: 70%
 
-          # Uncomment when Sprint 1 starts:
-          # MIN_COVERAGE=40
-          # if (( $(echo "$coverage < $MIN_COVERAGE" | bc -l) )); then
-          #   echo "ERROR: Code coverage is below ${MIN_COVERAGE}% (got ${coverage}%)"
-          #   exit 1
-          # fi
+          MIN_COVERAGE=40
+          if (( $(echo "$coverage < $MIN_COVERAGE" | bc -l) )); then
+            echo "ERROR: Code coverage is below ${MIN_COVERAGE}% (got ${coverage}%)"
+            exit 1
+          fi
 
-          echo "✅ Coverage check disabled for Sprint 0 (empty project)"
-          echo "Will enforce 40% minimum starting Sprint 1"
+          echo "✅ Coverage check passed: ${coverage}% (minimum: ${MIN_COVERAGE}%)"
 
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4
@@ -181,7 +177,7 @@ jobs:
           xcodebuild clean build \
             -scheme NoteTaker \
             -sdk iphonesimulator \
-            -destination 'platform=iOS Simulator,name=iPhone 15 Pro' \
+            -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
             -configuration Release \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \

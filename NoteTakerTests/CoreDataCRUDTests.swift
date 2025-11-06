@@ -28,7 +28,7 @@ struct CoreDataCRUDTests {
         let note = Note(context: context)
         note.id = UUID()
         note.title = "Test Note"
-        note.contentData = "Test content".data(using: .utf8)
+        note.contentData = Data("Test content".utf8)
         note.createdAt = Date()
         note.modifiedAt = Date()
         note.isPinned = false
@@ -118,7 +118,7 @@ struct CoreDataCRUDTests {
         // Verify it's deleted
         fetchRequest = Note.fetchRequest()
         notes = try context.fetch(fetchRequest)
-        #expect(notes.count == 0)
+        #expect(notes.isEmpty)
     }
 
     @Test func testNotePinning() async throws {
@@ -357,7 +357,7 @@ struct CoreDataCRUDTests {
         // Verify attachment was cascade deleted
         fetchRequest = Attachment.fetchRequest()
         attachments = try context.fetch(fetchRequest)
-        #expect(attachments.count == 0)
+        #expect(attachments.isEmpty)
     }
 
     // MARK: - Complex Relationship Tests
@@ -385,7 +385,7 @@ struct CoreDataCRUDTests {
         let note = Note(context: context)
         note.id = UUID()
         note.title = "Complete Note"
-        note.contentData = "Full content".data(using: .utf8)
+        note.contentData = Data("Full content".utf8)
         note.createdAt = Date()
         note.modifiedAt = Date()
         note.isPinned = true

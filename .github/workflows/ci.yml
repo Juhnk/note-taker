@@ -52,7 +52,7 @@ jobs:
             -scheme NoteTaker \
             -sdk iphonesimulator \
             -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
-            -only-testing:NoteTakerTests \
+            -skip-testing:NoteTakerUITests \
             -enableCodeCoverage YES \
             -derivedDataPath DerivedData \
             CODE_SIGN_IDENTITY="" \
@@ -118,7 +118,7 @@ jobs:
             -scheme NoteTaker \
             -sdk macosx \
             -destination 'platform=macOS' \
-            -only-testing:NoteTakerTests \
+            -skip-testing:NoteTakerUITests \
             -enableCodeCoverage YES \
             -derivedDataPath DerivedData \
             CODE_SIGN_IDENTITY="" \

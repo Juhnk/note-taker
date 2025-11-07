@@ -223,4 +223,32 @@ struct TextFormatter {
 
         textStorage.endEditing()
     }
+
+    /// Apply numbered list
+    static func applyNumberedList(to textView: NSTextView) {
+        guard let textStorage = textView.textStorage else { return }
+        let selectedRange = textView.selectedRange()
+
+        // Find the line range
+        let string = textStorage.string as NSString
+        let lineRange = string.lineRange(for: selectedRange)
+
+        textStorage.beginEditing()
+
+        // Create paragraph style with number
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.headIndent = 24
+        paragraphStyle.firstLineHeadIndent = 0
+
+        textStorage.addAttribute(.paragraphStyle, value: paragraphStyle, range: lineRange)
+
+        // Find the number for this item
+        // For now, use "1." - in future, could scan previous lines to find next number
+        let lineString = string.substring(with: lineRange)
+        if !lineString.prefix(3).contains(where: { $0.isNumber }) {
+            textStorage.insert(NSAttributedString(string: "1. "), at: lineRange.location)
+        }
+
+        textStorage.endEditing()
+    }
 }

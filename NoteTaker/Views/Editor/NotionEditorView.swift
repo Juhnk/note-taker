@@ -182,8 +182,7 @@ struct NotionEditorView: View {
         case .bulletList:
             TextFormatter.applyBulletList(to: textView)
         case .numberedList:
-            // TODO: Implement numbered list
-            break
+            TextFormatter.applyNumberedList(to: textView)
         case .code, .link:
             // TODO: Implement code and link formatting
             break

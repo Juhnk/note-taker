@@ -209,6 +209,10 @@ struct RichTextEditorWrapper: NSViewRepresentable {
         textView.font = .systemFont(ofSize: 16)
         textView.textColor = .labelColor
         textView.backgroundColor = .clear
+
+        // Enable markdown auto-conversion
+        let markdownConverter = MarkdownConverter(textView: textView)
+        context.coordinator.markdownConverter = markdownConverter
         textView.delegate = context.coordinator
 
         // Automatic features
@@ -247,6 +251,7 @@ struct RichTextEditorWrapper: NSViewRepresentable {
 
     class Coordinator: NSObject, NSTextViewDelegate {
         var parent: RichTextEditorWrapper
+        var markdownConverter: MarkdownConverter?
 
         init(_ parent: RichTextEditorWrapper) {
             self.parent = parent
@@ -254,6 +259,11 @@ struct RichTextEditorWrapper: NSViewRepresentable {
 
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
+
+            // First, let markdown converter process
+            markdownConverter?.textDidChange(notification)
+
+            // Then update the binding
             parent.attributedText = textView.attributedString()
         }
     }

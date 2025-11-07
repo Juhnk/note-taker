@@ -71,7 +71,7 @@ struct FormattingToolbar: View {
             Spacer()
 
             // Markdown hint
-            Text("Tip: Use **bold**, *italic*, # heading")
+            Text("Markdown: **bold**, *italic*, # heading, - list")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }

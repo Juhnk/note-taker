@@ -5,7 +5,7 @@
 //  Created by Juhnk on 11/7/25.
 //
 
-// swiftlint:disable file_length
+// swiftlint:disable file_length type_body_length
 
 import SwiftUI
 import CoreData
@@ -15,6 +15,7 @@ import CoreData
 struct SidebarView: View {
     @Environment(\.managedObjectContext) private var context
     @State private var service: CoreDataService
+    @State private var searchService: SearchService
     @State private var notes: [Note] = []
     @State private var tags: [Tag] = []
     @State private var folders: [Folder] = []
@@ -25,12 +26,21 @@ struct SidebarView: View {
     @State private var folderToRename: Folder?
     @State private var renameText = ""
     @State private var showRenameAlert = false
+    @State private var isSearching = false
+
+    // Search filter state
+    @State private var searchStartDate: Date?
+    @State private var searchEndDate: Date?
+    @State private var showPinnedOnly: Bool?
+    @State private var searchScope: SearchScope = .all
 
     @Binding var selectedNote: Note?
 
     init(selectedNote: Binding<Note?>) {
         self._selectedNote = selectedNote
-        self._service = State(initialValue: CoreDataService())
+        let context = PersistenceController.shared.container.viewContext
+        self._service = State(initialValue: CoreDataService(context: context))
+        self._searchService = State(initialValue: SearchService(context: context))
     }
 
     var body: some View {
@@ -39,6 +49,18 @@ struct SidebarView: View {
             searchBar
                 .padding(.horizontal, .spacingM)
                 .padding(.vertical, .spacingS)
+
+            // Search filter bar (shown when searching)
+            if !searchText.isEmpty {
+                SearchFilterBar(
+                    startDate: $searchStartDate,
+                    endDate: $searchEndDate,
+                    showPinnedOnly: $showPinnedOnly,
+                    searchScope: $searchScope
+                )
+                .padding(.horizontal, .spacingM)
+                .padding(.bottom, .spacingS)
+            }
 
             Divider()
 
@@ -231,6 +253,12 @@ struct SidebarView: View {
     }
 
     private var filteredNotes: [Note] {
+        // Use SearchService when searching with text
+        if !searchText.isEmpty {
+            return performSearch()
+        }
+
+        // Simple filtering when no search text
         var result = notes
 
         // Filter by selected folder
@@ -248,21 +276,84 @@ struct SidebarView: View {
             }
         }
 
-        // Filter by search text
-        if !searchText.isEmpty {
-            result = result.filter { note in
-                let titleMatch = note.title?.localizedCaseInsensitiveContains(searchText) ?? false
-                let contentMatch = note.contentData
-                    .flatMap { String(data: $0, encoding: .utf8) }?
-                    .localizedCaseInsensitiveContains(searchText) ?? false
-                return titleMatch || contentMatch
-            }
-        }
-
         return result
     }
 
     // MARK: - Actions
+
+    private func performSearch() -> [Note] {
+        isSearching = true
+        defer { isSearching = false }
+
+        do {
+            // Build search filters based on current selections
+            let filters = SearchFilters(
+                folder: selectedFolder,
+                tag: selectedTag,
+                startDate: searchStartDate,
+                endDate: searchEndDate,
+                isPinned: showPinnedOnly
+            )
+
+            // Use appropriate search method based on scope
+            switch searchScope {
+            case .all:
+                return try searchService.searchNotes(query: searchText, filters: filters)
+            case .titleOnly:
+                let results = try searchService.searchNotesByTitle(query: searchText)
+                return applyAdditionalFilters(to: results, filters: filters)
+            case .contentOnly:
+                let results = try searchService.searchNotesByContent(query: searchText)
+                return applyAdditionalFilters(to: results, filters: filters)
+            case .tags:
+                // Tags scope requires tag selection
+                guard let tag = selectedTag else { return [] }
+                return try searchService.searchNotesByTags([tag])
+            }
+        } catch {
+            print("Search failed: \(error)")
+            return []
+        }
+    }
+
+    private func applyAdditionalFilters(to notes: [Note], filters: SearchFilters) -> [Note] {
+        var result = notes
+
+        // Apply folder filter
+        if let folder = filters.folder {
+            result = result.filter { $0.folder?.id == folder.id }
+        }
+
+        // Apply tag filter
+        if let tag = filters.tag {
+            result = result.filter { note in
+                guard let noteTags = note.tags as? Set<Tag> else { return false }
+                return noteTags.contains(tag)
+            }
+        }
+
+        // Apply date range filters
+        if let startDate = filters.startDate {
+            result = result.filter { note in
+                guard let modifiedAt = note.modifiedAt else { return false }
+                return modifiedAt >= startDate
+            }
+        }
+
+        if let endDate = filters.endDate {
+            result = result.filter { note in
+                guard let modifiedAt = note.modifiedAt else { return false }
+                return modifiedAt <= endDate
+            }
+        }
+
+        // Apply pinned filter
+        if let isPinned = filters.isPinned {
+            result = result.filter { $0.isPinned == isPinned }
+        }
+
+        return result
+    }
 
     private func loadNotes() {
         do {

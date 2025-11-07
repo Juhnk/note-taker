@@ -17,7 +17,9 @@ struct RichTextEditor: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = NSTextView.scrollableTextView()
-        let textView = scrollView.documentView as! NSTextView
+        guard let textView = scrollView.documentView as? NSTextView else {
+            fatalError("Failed to create NSTextView")
+        }
 
         // Configure text view for rich text editing
         textView.isRichText = true
@@ -41,7 +43,7 @@ struct RichTextEditor: NSViewRepresentable {
     }
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
-        let textView = scrollView.documentView as! NSTextView
+        guard let textView = scrollView.documentView as? NSTextView else { return }
 
         // Only update if text has actually changed
         if textView.attributedString() != attributedText {

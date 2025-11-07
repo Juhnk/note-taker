@@ -89,10 +89,10 @@ struct NotionEditorView: View {
                 }
             }
         }
-        .onChange(of: title) { _, newValue in
+        .onChange(of: title) { _, _ in
             saveNote()
         }
-        .onChange(of: attributedContent) { _, newValue in
+        .onChange(of: attributedContent) { _, _ in
             saveNote()
         }
         .onChange(of: textViewRef) { _, newValue in
@@ -119,10 +119,15 @@ struct NotionEditorView: View {
     }
 
     private var richTextEditor: some View {
-        RichTextEditorWrapper(attributedText: $attributedContent, textViewRef: $textViewRef)
-            .frame(minHeight: 400)
-            .accessibilityLabel("Note content")
-            .accessibilityHint("Enter the content for this note. Use formatting toolbar for bold, italic, headings, and lists")
+        RichTextEditorWrapper(
+            attributedText: $attributedContent,
+            textViewRef: $textViewRef
+        )
+        .frame(minHeight: 400)
+        .accessibilityLabel("Note content")
+        .accessibilityHint(
+            "Enter the content for this note. Use formatting toolbar"
+        )
     }
 
     // MARK: - Actions
@@ -135,7 +140,11 @@ struct NotionEditorView: View {
                 do {
                     // Convert attributed string to data for storage
                     let contentData = attributedContent.toData()
-                    try service.updateNote(note, title: title, content: nil)
+                    try service.updateNote(
+                        note,
+                        title: title,
+                        content: nil
+                    )
 
                     // Update content data separately
                     note.contentData = contentData
@@ -161,6 +170,13 @@ struct NotionEditorView: View {
     private func handleFormattingAction(_ action: FormattingAction) {
         guard let textView = textViewRef else { return }
 
+        applyFormatting(action, to: textView)
+
+        // Update the attributed content binding
+        attributedContent = textView.attributedString()
+    }
+
+    private func applyFormatting(_ action: FormattingAction, to textView: NSTextView) {
         switch action {
         case .bold:
             TextFormatter.applyBold(to: textView)
@@ -173,23 +189,26 @@ struct NotionEditorView: View {
         case .heading3:
             TextFormatter.applyHeading(to: textView, level: 3)
         case .normal:
-            // Reset to normal text
-            if let textStorage = textView.textStorage {
-                let range = textView.selectedRange()
-                let lineRange = (textStorage.string as NSString).lineRange(for: range)
-                textStorage.addAttribute(.font, value: NSFont.systemFont(ofSize: 16), range: lineRange)
-            }
+            applyNormalText(to: textView)
         case .bulletList:
             TextFormatter.applyBulletList(to: textView)
         case .numberedList:
             TextFormatter.applyNumberedList(to: textView)
         case .code, .link:
-            // TODO: Implement code and link formatting
+            // Code and link formatting will be implemented in future sprint
             break
         }
+    }
 
-        // Update the attributed content binding
-        attributedContent = textView.attributedString()
+    private func applyNormalText(to textView: NSTextView) {
+        guard let textStorage = textView.textStorage else { return }
+        let range = textView.selectedRange()
+        let lineRange = (textStorage.string as NSString).lineRange(for: range)
+        textStorage.addAttribute(
+            .font,
+            value: NSFont.systemFont(ofSize: 16),
+            range: lineRange
+        )
     }
 }
 
@@ -201,7 +220,9 @@ struct RichTextEditorWrapper: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = NSTextView.scrollableTextView()
-        let textView = scrollView.documentView as! NSTextView
+        guard let textView = scrollView.documentView as? NSTextView else {
+            fatalError("Failed to create NSTextView")
+        }
 
         // Configure text view
         textView.isRichText = true
@@ -233,7 +254,7 @@ struct RichTextEditorWrapper: NSViewRepresentable {
     }
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
-        let textView = scrollView.documentView as! NSTextView
+        guard let textView = scrollView.documentView as? NSTextView else { return }
 
         if textView.attributedString() != attributedText {
             let selectedRange = textView.selectedRange()
@@ -277,7 +298,15 @@ struct RichTextEditorWrapper: NSViewRepresentable {
     let note = Note(context: context)
     note.id = UUID()
     note.title = "Meeting Notes"
-    note.contentData = Data("Discussed project timeline and deliverables.\n\nKey points:\n- Focus on core features first\n- Plan for Q1 launch\n- Review designs next week".utf8)
+    let content = """
+        Discussed project timeline and deliverables.
+
+        Key points:
+        - Focus on core features first
+        - Plan for Q1 launch
+        - Review designs next week
+        """
+    note.contentData = Data(content.utf8)
     note.modifiedAt = Date()
     note.isPinned = false
 

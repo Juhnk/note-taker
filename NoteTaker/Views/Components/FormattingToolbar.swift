@@ -87,7 +87,7 @@ struct FormattingToolbar: View {
 struct ToolbarButton: View {
     let icon: String
     let label: String
-    var shortcut: String? = nil
+    var shortcut: String?
     let action: () -> Void
 
     var body: some View {
@@ -97,11 +97,18 @@ struct ToolbarButton: View {
                 .frame(width: 28, height: 28)
         }
         .buttonStyle(.plain)
-        .help(shortcut != nil ? "\(label) (\(shortcut!))" : label)
+        .help(helpText)
         .background(
             RoundedRectangle(cornerRadius: 4)
                 .fill(Color.clear)
         )
+    }
+
+    private var helpText: String {
+        if let shortcut = shortcut {
+            return "\(label) (\(shortcut))"
+        }
+        return label
     }
 }
 

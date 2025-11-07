@@ -85,9 +85,10 @@ struct SidebarView: View {
                 ForEach(favoriteNotes) { note in
                     SidebarNoteRow(
                         note: note,
-                        isSelected: selectedNote?.id == note.id,
-                        action: { selectedNote = note }
-                    )
+                        isSelected: selectedNote?.id == note.id
+                    ) {
+                        selectedNote = note
+                    }
                 }
             }
         }
@@ -100,9 +101,10 @@ struct SidebarView: View {
             ForEach(filteredNotes) { note in
                 SidebarNoteRow(
                     note: note,
-                    isSelected: selectedNote?.id == note.id,
-                    action: { selectedNote = note }
-                )
+                    isSelected: selectedNote?.id == note.id
+                ) {
+                    selectedNote = note
+                }
             }
         }
     }
@@ -173,7 +175,9 @@ struct SidebarSectionHeader: View {
     @State private var isExpanded = true
 
     var body: some View {
-        Button(action: { isExpanded.toggle() }) {
+        Button {
+            isExpanded.toggle()
+        } label: {
             HStack(spacing: .spacingS) {
                 Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
                     .font(.system(size: 10))

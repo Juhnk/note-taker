@@ -43,31 +43,63 @@ class MarkdownConverter: NSObject, NSTextViewDelegate {
         let lineText = text.substring(with: lineRange)
 
         // Try different markdown patterns
-        if let result = convertBoldMarkdown(lineText, in: lineRange, textStorage: textStorage, cursor: selectedRange.location) {
+        if let result = convertBoldMarkdown(
+            lineText,
+            in: lineRange,
+            textStorage: textStorage,
+            cursor: selectedRange.location
+        ) {
             textView.setSelectedRange(NSRange(location: result, length: 0))
-        } else if let result = convertItalicMarkdown(lineText, in: lineRange, textStorage: textStorage, cursor: selectedRange.location) {
+        } else if let result = convertItalicMarkdown(
+            lineText,
+            in: lineRange,
+            textStorage: textStorage,
+            cursor: selectedRange.location
+        ) {
             textView.setSelectedRange(NSRange(location: result, length: 0))
-        } else if let result = convertHeadingMarkdown(lineText, in: lineRange, textStorage: textStorage, cursor: selectedRange.location) {
+        } else if let result = convertHeadingMarkdown(
+            lineText,
+            in: lineRange,
+            textStorage: textStorage,
+            cursor: selectedRange.location
+        ) {
             textView.setSelectedRange(NSRange(location: result, length: 0))
-        } else if let result = convertBulletListMarkdown(lineText, in: lineRange, textStorage: textStorage, cursor: selectedRange.location) {
+        } else if let result = convertBulletListMarkdown(
+            lineText,
+            in: lineRange,
+            textStorage: textStorage,
+            cursor: selectedRange.location
+        ) {
             textView.setSelectedRange(NSRange(location: result, length: 0))
         }
     }
 
     // MARK: - Bold Conversion (**text**)
 
-    private func convertBoldMarkdown(_ lineText: String, in lineRange: NSRange, textStorage: NSTextStorage, cursor: Int) -> Int? {
+    private func convertBoldMarkdown(
+        _ lineText: String,
+        in lineRange: NSRange,
+        textStorage: NSTextStorage,
+        cursor: Int
+    ) -> Int? {
         // Pattern: **text** followed by space
         let pattern = "\\*\\*(.+?)\\*\\* $"
         guard let regex = try? NSRegularExpression(pattern: pattern),
-              let match = regex.firstMatch(in: lineText, range: NSRange(location: 0, length: lineText.count)) else {
+              let match = regex.firstMatch(
+                in: lineText,
+                range: NSRange(location: 0, length: lineText.count)
+              ) else {
             return nil
         }
 
-        let matchRange = NSRange(location: lineRange.location + match.range.location,
-                                length: match.range.length)
-        let contentRange = NSRange(location: lineRange.location + match.range(at: 1).location,
-                                  length: match.range(at: 1).length)
+        let matchRange = NSRange(
+            location: lineRange.location + match.range.location,
+            length: match.range.length
+        )
+        let contentRange = NSRange(
+            location: lineRange.location + match.range(at: 1).location,
+            length: match.range(at: 1).length
+        )
 
         textStorage.beginEditing()
 
@@ -90,18 +122,30 @@ class MarkdownConverter: NSObject, NSTextViewDelegate {
 
     // MARK: - Italic Conversion (*text*)
 
-    private func convertItalicMarkdown(_ lineText: String, in lineRange: NSRange, textStorage: NSTextStorage, cursor: Int) -> Int? {
+    private func convertItalicMarkdown(
+        _ lineText: String,
+        in lineRange: NSRange,
+        textStorage: NSTextStorage,
+        cursor: Int
+    ) -> Int? {
         // Pattern: *text* followed by space (but not **text**)
         let pattern = "(?<!\\*)\\*([^*]+?)\\* $"
         guard let regex = try? NSRegularExpression(pattern: pattern),
-              let match = regex.firstMatch(in: lineText, range: NSRange(location: 0, length: lineText.count)) else {
+              let match = regex.firstMatch(
+                in: lineText,
+                range: NSRange(location: 0, length: lineText.count)
+              ) else {
             return nil
         }
 
-        let matchRange = NSRange(location: lineRange.location + match.range.location,
-                                length: match.range.length)
-        let contentRange = NSRange(location: lineRange.location + match.range(at: 1).location,
-                                  length: match.range(at: 1).length)
+        let matchRange = NSRange(
+            location: lineRange.location + match.range.location,
+            length: match.range.length
+        )
+        let contentRange = NSRange(
+            location: lineRange.location + match.range(at: 1).location,
+            length: match.range(at: 1).length
+        )
 
         textStorage.beginEditing()
 
@@ -126,17 +170,27 @@ class MarkdownConverter: NSObject, NSTextViewDelegate {
 
     // MARK: - Heading Conversion (# Heading)
 
-    private func convertHeadingMarkdown(_ lineText: String, in lineRange: NSRange, textStorage: NSTextStorage, cursor: Int) -> Int? {
+    private func convertHeadingMarkdown(
+        _ lineText: String,
+        in lineRange: NSRange,
+        textStorage: NSTextStorage,
+        cursor: Int
+    ) -> Int? {
         // Pattern: # Heading, ## Heading, or ### Heading at start of line
         let pattern = "^(#{1,3}) (.+?) $"
         guard let regex = try? NSRegularExpression(pattern: pattern),
-              let match = regex.firstMatch(in: lineText, range: NSRange(location: 0, length: lineText.count)) else {
+              let match = regex.firstMatch(
+                in: lineText,
+                range: NSRange(location: 0, length: lineText.count)
+              ) else {
             return nil
         }
 
         let hashesRange = match.range(at: 1)
-        let contentRange = NSRange(location: lineRange.location + match.range(at: 2).location,
-                                  length: match.range(at: 2).length)
+        let contentRange = NSRange(
+            location: lineRange.location + match.range(at: 2).location,
+            length: match.range(at: 2).length
+        )
         let matchRange = NSRange(location: lineRange.location, length: match.range.length)
 
         let hashCount = hashesRange.length
@@ -171,7 +225,12 @@ class MarkdownConverter: NSObject, NSTextViewDelegate {
 
     // MARK: - Bullet List Conversion (- or *)
 
-    private func convertBulletListMarkdown(_ lineText: String, in lineRange: NSRange, textStorage: NSTextStorage, cursor: Int) -> Int? {
+    private func convertBulletListMarkdown(
+        _ lineText: String,
+        in lineRange: NSRange,
+        textStorage: NSTextStorage,
+        cursor: Int
+    ) -> Int? {
         // Pattern: - or * at start of line followed by space
         let pattern = "^[-*] $"
         guard let regex = try? NSRegularExpression(pattern: pattern),

@@ -120,6 +120,7 @@ struct SidebarView: View {
             loadNotes()
             loadTags()
             loadFolders()
+            loadExpandedFoldersState()
         }
     }
 
@@ -187,56 +188,90 @@ struct SidebarView: View {
         }
     }
 
-    private func folderRowWithNotes(_ folder: Folder) -> some View {
+    /// Recursively renders a folder with its subfolders and notes
+    /// - Parameters:
+    ///   - folder: The folder to render
+    ///   - depth: The current depth level (0 for root folders)
+    @ViewBuilder
+    private func recursiveFolderView(_ folder: Folder, depth: Int = 0) -> some View {
         VStack(spacing: 0) {
-            // Folder row
-            HStack(spacing: .spacingS) {
-                Button {
-                    toggleFolderExpansion(folder)
-                } label: {
-                    Image(systemName: isExpanded(folder) ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 12)
-                }
-                .buttonStyle(.plain)
+            // Folder row with depth-based indentation
+            folderRow(folder, depth: depth)
 
-                SidebarFolderRow(
-                    folder: folder,
-                    isSelected: selectedFolder?.id == folder.id
-                ) {
-                    selectedFolder = folder
-                }
-                .contextMenu {
-                    Button("Rename") {
-                        startRenaming(folder)
-                    }
-                    Divider()
-                    Button("Delete", role: .destructive) {
-                        deleteFolder(folder)
-                    }
-                }
-            }
-            .padding(.leading, .spacingS)
-
-            // Notes in folder (when expanded)
+            // When expanded, show notes and subfolders
             if isExpanded(folder) {
+                // Show notes in this folder
                 ForEach(notesInFolder(folder)) { note in
-                    SidebarNoteRow(
-                        note: note,
-                        isSelected: selectedNote?.id == note.id
-                    ) {
-                        selectedNote = note
-                    }
-                    .padding(.leading, 28) // Indent notes under folder
-                    .contextMenu {
-                        Button("Delete", role: .destructive) {
-                            deleteNote(note)
-                        }
+                    noteRow(note, depth: depth + 1)
+                }
+
+                // Recursively show subfolders
+                if let subfolders = folder.subfolders as? Set<Folder> {
+                    ForEach(Array(subfolders).sorted(by: {
+                        ($0.name ?? "") < ($1.name ?? "")
+                    })) { subfolder in
+                        AnyView(recursiveFolderView(subfolder, depth: depth + 1))
                     }
                 }
             }
         }
+    }
+
+    /// Renders a single folder row with proper indentation
+    private func folderRow(_ folder: Folder, depth: Int) -> some View {
+        HStack(spacing: .spacingS) {
+            // Disclosure triangle
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    toggleFolderExpansion(folder)
+                }
+            } label: {
+                Image(systemName: isExpanded(folder) ? "chevron.down" : "chevron.right")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 24, height: 24) // Larger hit area
+            }
+            .buttonStyle(.plain)
+
+            SidebarFolderRow(
+                folder: folder,
+                isSelected: selectedFolder?.id == folder.id,
+                noteCount: noteCount(in: folder)
+            ) {
+                selectedFolder = folder
+            }
+            .contextMenu {
+                Button("Rename") {
+                    startRenaming(folder)
+                }
+                Divider()
+                Button("Delete", role: .destructive) {
+                    deleteFolder(folder)
+                }
+            }
+        }
+        .padding(.leading, CGFloat(depth) * 16 + .spacingS) // 16pt per depth level
+    }
+
+    /// Renders a single note row with proper indentation
+    private func noteRow(_ note: Note, depth: Int) -> some View {
+        SidebarNoteRow(
+            note: note,
+            isSelected: selectedNote?.id == note.id
+        ) {
+            selectedNote = note
+        }
+        .padding(.leading, CGFloat(depth) * 16 + .spacingS) // 16pt per depth level
+        .contextMenu {
+            Button("Delete", role: .destructive) {
+                deleteNote(note)
+            }
+        }
+    }
+
+    /// Backwards compatibility wrapper - calls recursive version
+    private func folderRowWithNotes(_ folder: Folder) -> some View {
+        recursiveFolderView(folder, depth: 0)
     }
 
     private var tagsSection: some View {
@@ -259,7 +294,7 @@ struct SidebarView: View {
     private var allNotesSection: some View {
         VStack(spacing: 0) {
             SidebarSectionHeader(
-                title: "Notes (No Folder)",
+                title: "Unfiled Notes",
                 icon: "doc.text"
             )
 
@@ -343,6 +378,11 @@ struct SidebarView: View {
         return expandedFolders.contains(id)
     }
 
+    /// Returns the count of notes directly in a folder (not including subfolders)
+    private func noteCount(in folder: Folder) -> Int {
+        notesInFolder(folder).count
+    }
+
     // MARK: - Actions
 
     private func toggleFolderExpansion(_ folder: Folder) {
@@ -351,6 +391,20 @@ struct SidebarView: View {
             expandedFolders.remove(id)
         } else {
             expandedFolders.insert(id)
+        }
+        saveExpandedFoldersState()
+    }
+
+    /// Saves the expanded folders state to UserDefaults
+    private func saveExpandedFoldersState() {
+        let uuidStrings = expandedFolders.map { $0.uuidString }
+        UserDefaults.standard.set(uuidStrings, forKey: "expandedFolders")
+    }
+
+    /// Loads the expanded folders state from UserDefaults
+    private func loadExpandedFoldersState() {
+        if let uuidStrings = UserDefaults.standard.stringArray(forKey: "expandedFolders") {
+            expandedFolders = Set(uuidStrings.compactMap { UUID(uuidString: $0) })
         }
     }
 
@@ -580,16 +634,18 @@ struct SidebarNoteRow: View {
     let isSelected: Bool
     let action: () -> Void
 
+    @State private var isHovered = false
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: .spacingS) {
                 Image(systemName: "doc.text")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 11)) // Smaller icon for notes
+                    .foregroundStyle(.tertiary) // More subdued
                     .frame(width: 16, alignment: .center)
 
                 Text(note.title ?? "Untitled")
-                    .font(.system(size: 13))
+                    .font(.system(size: 13)) // Regular weight (not bold)
                     .lineLimit(1)
                     .foregroundStyle(isSelected ? .primary : .secondary)
 
@@ -603,10 +659,16 @@ struct SidebarNoteRow: View {
             }
             .padding(.horizontal, .spacingM)
             .padding(.vertical, 4)
-            .background(isSelected ? Color.accentColor.opacity(0.1) : Color.clear)
+            .background(
+                isSelected ? Color.accentColor.opacity(0.1) :
+                    isHovered ? Color.secondary.opacity(0.05) : Color.clear
+            )
             .cornerRadius(4)
         }
         .buttonStyle(.plain)
+        .onHover { hovering in
+            isHovered = hovering
+        }
     }
 }
 
@@ -615,29 +677,49 @@ struct SidebarNoteRow: View {
 struct SidebarFolderRow: View {
     let folder: Folder
     let isSelected: Bool
+    let noteCount: Int
     let action: () -> Void
+
+    @State private var isHovered = false
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: .spacingS) {
                 Image(systemName: folder.icon ?? "folder")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 16, alignment: .center)
+                    .font(.system(size: 14, weight: .semibold)) // Larger, bolder for folders
+                    .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+                    .frame(width: 18, alignment: .center)
 
                 Text(folder.name ?? "Untitled")
-                    .font(.system(size: 13))
+                    .font(.system(size: 13, weight: .semibold)) // Bold for folders
                     .lineLimit(1)
                     .foregroundStyle(isSelected ? .primary : .secondary)
 
                 Spacer()
+
+                // Count badge
+                if noteCount > 0 {
+                    Text("\(noteCount)")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.secondary.opacity(0.1))
+                        .cornerRadius(8)
+                }
             }
             .padding(.horizontal, .spacingM)
             .padding(.vertical, 4)
-            .background(isSelected ? Color.accentColor.opacity(0.1) : Color.clear)
+            .background(
+                isSelected ? Color.accentColor.opacity(0.1) :
+                    isHovered ? Color.secondary.opacity(0.05) : Color.clear
+            )
             .cornerRadius(4)
         }
         .buttonStyle(.plain)
+        .onHover { hovering in
+            isHovered = hovering
+        }
         .accessibilityLabel("Show notes in \(folder.name ?? "folder")")
     }
 }

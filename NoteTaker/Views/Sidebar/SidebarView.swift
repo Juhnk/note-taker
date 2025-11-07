@@ -15,8 +15,11 @@ struct SidebarView: View {
     @State private var service: CoreDataService
     @State private var notes: [Note] = []
     @State private var tags: [Tag] = []
+    @State private var folders: [Folder] = []
     @State private var searchText = ""
     @State private var selectedTag: Tag?
+    @State private var selectedFolder: Folder?
+    @State private var showFolderDialog = false
 
     @Binding var selectedNote: Note?
 
@@ -40,6 +43,9 @@ struct SidebarView: View {
                     // Favorites section
                     favoritesSection
 
+                    // Folders section
+                    foldersSection
+
                     // Tags section
                     tagsSection
 
@@ -59,9 +65,15 @@ struct SidebarView: View {
         }
         .frame(width: 224) // Notion's sidebar width
         .background(Color(nsColor: .controlBackgroundColor))
+        .sheet(isPresented: $showFolderDialog) {
+            FolderDialog(parent: nil) { name, icon in
+                createFolder(name: name, icon: icon)
+            }
+        }
         .onAppear {
             loadNotes()
             loadTags()
+            loadFolders()
         }
     }
 
@@ -94,6 +106,40 @@ struct SidebarView: View {
                         isSelected: selectedNote?.id == note.id
                     ) {
                         selectedNote = note
+                    }
+                }
+            }
+        }
+    }
+
+    private var foldersSection: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: .spacingS) {
+                SidebarSectionHeader(title: "Folders", icon: "folder")
+                Spacer()
+                Button {
+                    showFolderDialog = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .padding(.trailing, .spacingM)
+            }
+
+            if !folders.isEmpty {
+                ForEach(folders) { folder in
+                    SidebarFolderRow(
+                        folder: folder,
+                        isSelected: selectedFolder?.id == folder.id
+                    ) {
+                        toggleFolderFilter(folder)
+                    }
+                    .contextMenu {
+                        Button("Delete", role: .destructive) {
+                            deleteFolder(folder)
+                        }
                     }
                 }
             }
@@ -162,6 +208,13 @@ struct SidebarView: View {
     private var filteredNotes: [Note] {
         var result = notes
 
+        // Filter by selected folder
+        if let selectedFolder = selectedFolder {
+            result = result.filter { note in
+                note.folder?.id == selectedFolder.id
+            }
+        }
+
         // Filter by selected tag
         if let selectedTag = selectedTag {
             result = result.filter { note in
@@ -219,6 +272,50 @@ struct SidebarView: View {
         } else {
             // Select new tag
             selectedTag = tag
+            // Clear folder filter when selecting tag
+            selectedFolder = nil
+        }
+    }
+
+    private func loadFolders() {
+        do {
+            folders = try service.fetchFolders(under: nil) // Load root folders
+        } catch {
+            print("Failed to load folders: \(error)")
+        }
+    }
+
+    private func createFolder(name: String, icon: String?) {
+        do {
+            let newFolder = try service.createFolder(name: name, parent: nil, icon: icon)
+            loadFolders()
+            selectedFolder = newFolder
+        } catch {
+            print("Failed to create folder: \(error)")
+        }
+    }
+
+    private func deleteFolder(_ folder: Folder) {
+        do {
+            try service.deleteFolder(folder)
+            if selectedFolder?.id == folder.id {
+                selectedFolder = nil
+            }
+            loadFolders()
+        } catch {
+            print("Failed to delete folder: \(error)")
+        }
+    }
+
+    private func toggleFolderFilter(_ folder: Folder) {
+        if selectedFolder?.id == folder.id {
+            // Deselect if already selected
+            selectedFolder = nil
+        } else {
+            // Select new folder
+            selectedFolder = folder
+            // Clear tag filter when selecting folder
+            selectedTag = nil
         }
     }
 }
@@ -291,6 +388,38 @@ struct SidebarNoteRow: View {
             .cornerRadius(4)
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Sidebar Folder Row
+
+struct SidebarFolderRow: View {
+    let folder: Folder
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: .spacingS) {
+                Image(systemName: folder.icon ?? "folder")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 16, alignment: .center)
+
+                Text(folder.name ?? "Untitled")
+                    .font(.system(size: 13))
+                    .lineLimit(1)
+                    .foregroundStyle(isSelected ? .primary : .secondary)
+
+                Spacer()
+            }
+            .padding(.horizontal, .spacingM)
+            .padding(.vertical, 4)
+            .background(isSelected ? Color.accentColor.opacity(0.1) : Color.clear)
+            .cornerRadius(4)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Show notes in \(folder.name ?? "folder")")
     }
 }
 

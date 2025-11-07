@@ -21,6 +21,7 @@ struct NotionEditorView: View {
     @State private var lastSaved: Date?
     @State private var textViewRef: NSTextView?
     @State private var showTagPicker = false
+    @State private var showFolderPicker = false
 
     @ObservedObject var note: Note
     @Binding var currentTextView: NSTextView?
@@ -75,6 +76,11 @@ struct NotionEditorView: View {
         .sheet(isPresented: $showTagPicker) {
             TagPicker(note: note)
         }
+        .sheet(isPresented: $showFolderPicker) {
+            FolderPicker(note: note) { folder in
+                moveToFolder(folder)
+            }
+        }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .controlBackgroundColor))
         .toolbar {
@@ -128,6 +134,36 @@ struct NotionEditorView: View {
     private var tagsSection: some View {
         VStack(alignment: .leading, spacing: .spacingS) {
             HStack(spacing: .spacingS) {
+                // Display current folder
+                if let folder = note.folder {
+                    Button {
+                        showFolderPicker = true
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: folder.icon ?? "folder")
+                                .font(.system(size: 11))
+                            Text(folder.name ?? "Untitled")
+                                .font(.system(size: 12))
+                        }
+                        .padding(.horizontal, .spacingS)
+                        .padding(.vertical, 4)
+                        .background(.background.secondary)
+                        .cornerRadius(12)
+                        .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Button {
+                        showFolderPicker = true
+                    } label: {
+                        Image(systemName: "folder")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Move to folder")
+                }
+
                 // Display current tags
                 if let tags = note.tags as? Set<Tag>, !tags.isEmpty {
                     ForEach(Array(tags).sorted(by: {
@@ -251,6 +287,14 @@ struct NotionEditorView: View {
             try service.removeTag(tag, from: note)
         } catch {
             print("Failed to remove tag: \(error)")
+        }
+    }
+
+    private func moveToFolder(_ folder: Folder?) {
+        do {
+            try service.updateNote(note, folder: folder)
+        } catch {
+            print("Failed to move note to folder: \(error)")
         }
     }
 }

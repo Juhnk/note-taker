@@ -5,6 +5,8 @@
 //  Created by Juhnk on 11/7/25.
 //
 
+// swiftlint:disable file_length
+
 import SwiftUI
 import CoreData
 
@@ -20,6 +22,9 @@ struct SidebarView: View {
     @State private var selectedTag: Tag?
     @State private var selectedFolder: Folder?
     @State private var showFolderDialog = false
+    @State private var folderToRename: Folder?
+    @State private var renameText = ""
+    @State private var showRenameAlert = false
 
     @Binding var selectedNote: Note?
 
@@ -69,6 +74,22 @@ struct SidebarView: View {
             FolderDialog(parent: nil) { name, icon in
                 createFolder(name: name, icon: icon)
             }
+        }
+        .alert("Rename Folder", isPresented: $showRenameAlert) {
+            TextField("Folder name", text: $renameText)
+            Button("Cancel", role: .cancel) {
+                folderToRename = nil
+                renameText = ""
+            }
+            Button("Rename") {
+                if let folder = folderToRename {
+                    renameFolder(folder, newName: renameText)
+                }
+                folderToRename = nil
+                renameText = ""
+            }
+        } message: {
+            Text("Enter a new name for this folder")
         }
         .onAppear {
             loadNotes()
@@ -137,6 +158,10 @@ struct SidebarView: View {
                         toggleFolderFilter(folder)
                     }
                     .contextMenu {
+                        Button("Rename") {
+                            startRenaming(folder)
+                        }
+                        Divider()
                         Button("Delete", role: .destructive) {
                             deleteFolder(folder)
                         }
@@ -316,6 +341,24 @@ struct SidebarView: View {
             selectedFolder = folder
             // Clear tag filter when selecting folder
             selectedTag = nil
+        }
+    }
+
+    private func startRenaming(_ folder: Folder) {
+        folderToRename = folder
+        renameText = folder.name ?? ""
+        showRenameAlert = true
+    }
+
+    private func renameFolder(_ folder: Folder, newName: String) {
+        let trimmedName = newName.trimmingCharacters(in: .whitespaces)
+        guard !trimmedName.isEmpty else { return }
+
+        do {
+            try service.updateFolder(folder, name: trimmedName)
+            loadFolders()
+        } catch {
+            print("Failed to rename folder: \(error)")
         }
     }
 }

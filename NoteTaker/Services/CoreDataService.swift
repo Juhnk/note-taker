@@ -220,6 +220,98 @@ final class CoreDataService {
         try context.save()
     }
 
+    // MARK: - Tag Operations
+
+    /// Creates a new tag or returns existing tag with the same name
+    /// - Parameter name: The tag's name
+    /// - Returns: The created or existing Tag entity
+    /// - Throws: Core Data save errors
+    func createTag(name: String) throws -> Tag {
+        // Check if tag with this name already exists (unique constraint)
+        let fetchRequest = Tag.fetchRequest()
+        fetchRequest.predicate = NSPredicate(format: "name ==[c] %@", name)
+        fetchRequest.fetchLimit = 1
+
+        if let existingTag = try context.fetch(fetchRequest).first {
+            return existingTag
+        }
+
+        // Create new tag
+        let tag = Tag(context: context)
+        tag.id = UUID()
+        tag.name = name
+
+        try context.save()
+        return tag
+    }
+
+    /// Fetches all tags sorted alphabetically
+    /// - Returns: Array of Tag entities
+    /// - Throws: Core Data fetch errors
+    func fetchTags() throws -> [Tag] {
+        let fetchRequest = Tag.fetchRequest()
+        fetchRequest.sortDescriptors = [NSSortDescriptor(keyPath: \Tag.name, ascending: true)]
+        return try context.fetch(fetchRequest)
+    }
+
+    /// Fetches a single tag by ID
+    /// - Parameter id: The tag's UUID
+    /// - Returns: The Tag entity if found, nil otherwise
+    /// - Throws: Core Data fetch errors
+    func fetchTag(by id: UUID) throws -> Tag? {
+        let fetchRequest = Tag.fetchRequest()
+        fetchRequest.predicate = NSPredicate(format: "id == %@", id as CVarArg)
+        fetchRequest.fetchLimit = 1
+
+        let results = try context.fetch(fetchRequest)
+        return results.first
+    }
+
+    /// Deletes a tag (removes it from all notes)
+    /// - Parameter tag: The tag to delete
+    /// - Throws: Core Data save errors
+    func deleteTag(_ tag: Tag) throws {
+        context.delete(tag)
+        try context.save()
+    }
+
+    /// Adds a tag to a note
+    /// - Parameters:
+    ///   - tag: The tag to add
+    ///   - note: The note to add the tag to
+    /// - Throws: Core Data save errors
+    func addTag(_ tag: Tag, to note: Note) throws {
+        note.addToTags(tag)
+        note.modifiedAt = Date()
+        try context.save()
+    }
+
+    /// Removes a tag from a note
+    /// - Parameters:
+    ///   - tag: The tag to remove
+    ///   - note: The note to remove the tag from
+    /// - Throws: Core Data save errors
+    func removeTag(_ tag: Tag, from note: Note) throws {
+        note.removeFromTags(tag)
+        note.modifiedAt = Date()
+        try context.save()
+    }
+
+    /// Fetches notes that have a specific tag
+    /// - Parameter tag: The tag to filter by
+    /// - Returns: Array of Note entities
+    /// - Throws: Core Data fetch errors
+    func fetchNotes(with tag: Tag) throws -> [Note] {
+        let fetchRequest = Note.fetchRequest()
+        fetchRequest.predicate = NSPredicate(format: "%@ IN tags", tag)
+        fetchRequest.sortDescriptors = [
+            NSSortDescriptor(keyPath: \Note.isPinned, ascending: false),
+            NSSortDescriptor(keyPath: \Note.modifiedAt, ascending: false)
+        ]
+
+        return try context.fetch(fetchRequest)
+    }
+
     // MARK: - Helper Methods
 
     /// Saves the context if there are unsaved changes

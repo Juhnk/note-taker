@@ -14,7 +14,9 @@ struct SidebarView: View {
     @Environment(\.managedObjectContext) private var context
     @State private var service: CoreDataService
     @State private var notes: [Note] = []
+    @State private var tags: [Tag] = []
     @State private var searchText = ""
+    @State private var selectedTag: Tag?
 
     @Binding var selectedNote: Note?
 
@@ -38,6 +40,9 @@ struct SidebarView: View {
                     // Favorites section
                     favoritesSection
 
+                    // Tags section
+                    tagsSection
+
                     // All notes section
                     allNotesSection
                 }
@@ -56,6 +61,7 @@ struct SidebarView: View {
         .background(Color(nsColor: .controlBackgroundColor))
         .onAppear {
             loadNotes()
+            loadTags()
         }
     }
 
@@ -94,9 +100,29 @@ struct SidebarView: View {
         }
     }
 
+    private var tagsSection: some View {
+        VStack(spacing: 0) {
+            if !tags.isEmpty {
+                SidebarSectionHeader(title: "Tags", icon: "tag")
+
+                ForEach(tags) { tag in
+                    SidebarTagRow(
+                        tag: tag,
+                        isSelected: selectedTag?.id == tag.id
+                    ) {
+                        toggleTagFilter(tag)
+                    }
+                }
+            }
+        }
+    }
+
     private var allNotesSection: some View {
         VStack(spacing: 0) {
-            SidebarSectionHeader(title: "All Notes", icon: "doc.text")
+            SidebarSectionHeader(
+                title: selectedTag == nil ? "All Notes" : "Filtered Notes",
+                icon: "doc.text"
+            )
 
             ForEach(filteredNotes) { note in
                 SidebarNoteRow(
@@ -134,16 +160,28 @@ struct SidebarView: View {
     }
 
     private var filteredNotes: [Note] {
-        if searchText.isEmpty {
-            return notes
+        var result = notes
+
+        // Filter by selected tag
+        if let selectedTag = selectedTag {
+            result = result.filter { note in
+                guard let noteTags = note.tags as? Set<Tag> else { return false }
+                return noteTags.contains(selectedTag)
+            }
         }
-        return notes.filter { note in
-            let titleMatch = note.title?.localizedCaseInsensitiveContains(searchText) ?? false
-            let contentMatch = note.contentData
-                .flatMap { String(data: $0, encoding: .utf8) }?
-                .localizedCaseInsensitiveContains(searchText) ?? false
-            return titleMatch || contentMatch
+
+        // Filter by search text
+        if !searchText.isEmpty {
+            result = result.filter { note in
+                let titleMatch = note.title?.localizedCaseInsensitiveContains(searchText) ?? false
+                let contentMatch = note.contentData
+                    .flatMap { String(data: $0, encoding: .utf8) }?
+                    .localizedCaseInsensitiveContains(searchText) ?? false
+                return titleMatch || contentMatch
+            }
         }
+
+        return result
     }
 
     // MARK: - Actions
@@ -163,6 +201,24 @@ struct SidebarView: View {
             loadNotes()
         } catch {
             print("Failed to create note: \(error)")
+        }
+    }
+
+    private func loadTags() {
+        do {
+            tags = try service.fetchTags()
+        } catch {
+            print("Failed to load tags: \(error)")
+        }
+    }
+
+    private func toggleTagFilter(_ tag: Tag) {
+        if selectedTag?.id == tag.id {
+            // Deselect if already selected
+            selectedTag = nil
+        } else {
+            // Select new tag
+            selectedTag = tag
         }
     }
 }
@@ -235,6 +291,38 @@ struct SidebarNoteRow: View {
             .cornerRadius(4)
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Sidebar Tag Row
+
+struct SidebarTagRow: View {
+    let tag: Tag
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: .spacingS) {
+                Image(systemName: "tag")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 16, alignment: .center)
+
+                Text(tag.name ?? "Unknown")
+                    .font(.system(size: 13))
+                    .lineLimit(1)
+                    .foregroundStyle(isSelected ? .primary : .secondary)
+
+                Spacer()
+            }
+            .padding(.horizontal, .spacingM)
+            .padding(.vertical, 4)
+            .background(isSelected ? Color.accentColor.opacity(0.1) : Color.clear)
+            .cornerRadius(4)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Filter by \(tag.name ?? "tag")")
     }
 }
 

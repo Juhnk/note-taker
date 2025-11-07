@@ -20,6 +20,7 @@ struct NotionEditorView: View {
     @State private var isSaving = false
     @State private var lastSaved: Date?
     @State private var textViewRef: NSTextView?
+    @State private var showTagPicker = false
 
     @ObservedObject var note: Note
     @Binding var currentTextView: NSTextView?
@@ -59,6 +60,9 @@ struct NotionEditorView: View {
                     // Title editor - Notion-style
                     titleEditor
 
+                    // Tags section
+                    tagsSection
+
                     // Rich text content editor
                     richTextEditor
 
@@ -67,6 +71,9 @@ struct NotionEditorView: View {
                 .padding(.spacingXL)
                 .padding(.horizontal, 120) // Notion-like centered content
             }
+        }
+        .sheet(isPresented: $showTagPicker) {
+            TagPicker(note: note)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .controlBackgroundColor))
@@ -116,6 +123,34 @@ struct NotionEditorView: View {
             .lineLimit(3)
             .accessibilityLabel("Note title")
             .accessibilityHint("Enter the title for this note")
+    }
+
+    private var tagsSection: some View {
+        VStack(alignment: .leading, spacing: .spacingS) {
+            HStack(spacing: .spacingS) {
+                // Display current tags
+                if let tags = note.tags as? Set<Tag>, !tags.isEmpty {
+                    ForEach(Array(tags).sorted(by: {
+                        ($0.name ?? "") < ($1.name ?? "")
+                    })) { tag in
+                        TagChip(tag: tag) {
+                            removeTag(tag)
+                        }
+                    }
+                }
+
+                // Add tag button
+                Button {
+                    showTagPicker = true
+                } label: {
+                    Image(systemName: "tag")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Add tags")
+            }
+        }
     }
 
     private var richTextEditor: some View {
@@ -209,6 +244,14 @@ struct NotionEditorView: View {
             value: NSFont.systemFont(ofSize: 16),
             range: lineRange
         )
+    }
+
+    private func removeTag(_ tag: Tag) {
+        do {
+            try service.removeTag(tag, from: note)
+        } catch {
+            print("Failed to remove tag: \(error)")
+        }
     }
 }
 

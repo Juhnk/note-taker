@@ -34,6 +34,9 @@ struct SidebarView: View {
     @State private var showPinnedOnly: Bool?
     @State private var searchScope: SearchScope = .all
 
+    // Folder expansion state
+    @State private var expandedFolders: Set<UUID> = []
+
     @Binding var selectedNote: Note?
 
     init(selectedNote: Binding<Note?>) {
@@ -150,6 +153,11 @@ struct SidebarView: View {
                     ) {
                         selectedNote = note
                     }
+                    .contextMenu {
+                        Button("Delete", role: .destructive) {
+                            deleteNote(note)
+                        }
+                    }
                 }
             }
         }
@@ -173,19 +181,57 @@ struct SidebarView: View {
 
             if !folders.isEmpty {
                 ForEach(folders) { folder in
-                    SidebarFolderRow(
-                        folder: folder,
-                        isSelected: selectedFolder?.id == folder.id
-                    ) {
-                        toggleFolderFilter(folder)
+                    folderRowWithNotes(folder)
+                }
+            }
+        }
+    }
+
+    private func folderRowWithNotes(_ folder: Folder) -> some View {
+        VStack(spacing: 0) {
+            // Folder row
+            HStack(spacing: .spacingS) {
+                Button {
+                    toggleFolderExpansion(folder)
+                } label: {
+                    Image(systemName: isExpanded(folder) ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 12)
+                }
+                .buttonStyle(.plain)
+
+                SidebarFolderRow(
+                    folder: folder,
+                    isSelected: selectedFolder?.id == folder.id
+                ) {
+                    selectedFolder = folder
+                }
+                .contextMenu {
+                    Button("Rename") {
+                        startRenaming(folder)
                     }
+                    Divider()
+                    Button("Delete", role: .destructive) {
+                        deleteFolder(folder)
+                    }
+                }
+            }
+            .padding(.leading, .spacingS)
+
+            // Notes in folder (when expanded)
+            if isExpanded(folder) {
+                ForEach(notesInFolder(folder)) { note in
+                    SidebarNoteRow(
+                        note: note,
+                        isSelected: selectedNote?.id == note.id
+                    ) {
+                        selectedNote = note
+                    }
+                    .padding(.leading, 28) // Indent notes under folder
                     .contextMenu {
-                        Button("Rename") {
-                            startRenaming(folder)
-                        }
-                        Divider()
                         Button("Delete", role: .destructive) {
-                            deleteFolder(folder)
+                            deleteNote(note)
                         }
                     }
                 }
@@ -213,16 +259,21 @@ struct SidebarView: View {
     private var allNotesSection: some View {
         VStack(spacing: 0) {
             SidebarSectionHeader(
-                title: selectedTag == nil ? "All Notes" : "Filtered Notes",
+                title: "Notes (No Folder)",
                 icon: "doc.text"
             )
 
-            ForEach(filteredNotes) { note in
+            ForEach(notesWithoutFolder) { note in
                 SidebarNoteRow(
                     note: note,
                     isSelected: selectedNote?.id == note.id
                 ) {
                     selectedNote = note
+                }
+                .contextMenu {
+                    Button("Delete", role: .destructive) {
+                        deleteNote(note)
+                    }
                 }
             }
         }
@@ -279,7 +330,41 @@ struct SidebarView: View {
         return result
     }
 
+    private var notesWithoutFolder: [Note] {
+        notes.filter { $0.folder == nil && !$0.isPinned }
+    }
+
+    private func notesInFolder(_ folder: Folder) -> [Note] {
+        notes.filter { $0.folder?.id == folder.id }
+    }
+
+    private func isExpanded(_ folder: Folder) -> Bool {
+        guard let id = folder.id else { return false }
+        return expandedFolders.contains(id)
+    }
+
     // MARK: - Actions
+
+    private func toggleFolderExpansion(_ folder: Folder) {
+        guard let id = folder.id else { return }
+        if expandedFolders.contains(id) {
+            expandedFolders.remove(id)
+        } else {
+            expandedFolders.insert(id)
+        }
+    }
+
+    private func deleteNote(_ note: Note) {
+        do {
+            try service.deleteNote(note)
+            if selectedNote?.id == note.id {
+                selectedNote = nil
+            }
+            loadNotes()
+        } catch {
+            print("Failed to delete note: \(error)")
+        }
+    }
 
     private func performSearch() -> [Note] {
         isSearching = true

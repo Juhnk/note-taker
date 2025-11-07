@@ -22,6 +22,8 @@ struct NotionEditorView: View {
     @State private var textViewRef: NSTextView?
     @State private var showTagPicker = false
     @State private var showFolderPicker = false
+    @State private var showFormattingToolbar = false
+    @State private var toolbarPosition: CGPoint = .zero
 
     @ObservedObject var note: Note
     @Binding var currentTextView: NSTextView?
@@ -47,14 +49,7 @@ struct NotionEditorView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Formatting toolbar
-            FormattingToolbar(textView: textViewRef) { action in
-                handleFormattingAction(action)
-            }
-            .padding(.horizontal, .spacingXL)
-            .padding(.top, .spacingM)
-
+        ZStack(alignment: .topLeading) {
             // Editor content
             ScrollView {
                 VStack(alignment: .leading, spacing: .spacingM) {
@@ -71,6 +66,16 @@ struct NotionEditorView: View {
                 }
                 .padding(.spacingXL)
                 .padding(.horizontal, 120) // Notion-like centered content
+            }
+
+            // Floating formatting toolbar (appears on text selection)
+            if showFormattingToolbar {
+                FloatingFormattingToolbar(
+                    position: toolbarPosition,
+                    onAction: { action in
+                        handleFormattingAction(action)
+                    }
+                )
             }
         }
         .sheet(isPresented: $showTagPicker) {
@@ -192,7 +197,10 @@ struct NotionEditorView: View {
     private var richTextEditor: some View {
         RichTextEditorWrapper(
             attributedText: $attributedContent,
-            textViewRef: $textViewRef
+            textViewRef: $textViewRef,
+            onSelectionChange: { range, rect in
+                handleSelectionChange(range: range, rect: rect)
+            }
         )
         .frame(minHeight: 400)
         .accessibilityLabel("Note content")
@@ -297,6 +305,29 @@ struct NotionEditorView: View {
             print("Failed to move note to folder: \(error)")
         }
     }
+
+    private func handleSelectionChange(range: NSRange, rect: NSRect) {
+        // Show toolbar only if text is selected
+        if range.length > 0 {
+            // Position toolbar above the selection with some offset
+            let toolbarWidth: CGFloat = 300
+            let toolbarHeight: CGFloat = 40
+            let verticalOffset: CGFloat = 50
+
+            // Center toolbar horizontally on selection, position above it
+            var x = rect.midX + 120 // Account for content padding
+            var y = rect.minY - verticalOffset + 100 // Account for content padding
+
+            // Keep toolbar within reasonable bounds
+            x = max(toolbarWidth / 2, min(x, 800 - toolbarWidth / 2))
+            y = max(toolbarHeight, y)
+
+            toolbarPosition = CGPoint(x: x, y: y)
+            showFormattingToolbar = true
+        } else {
+            showFormattingToolbar = false
+        }
+    }
 }
 
 // MARK: - Rich Text Editor Wrapper
@@ -304,6 +335,7 @@ struct NotionEditorView: View {
 struct RichTextEditorWrapper: NSViewRepresentable {
     @Binding var attributedText: NSAttributedString
     @Binding var textViewRef: NSTextView?
+    var onSelectionChange: ((NSRange, NSRect) -> Void)?
 
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = NSTextView.scrollableTextView()
@@ -373,6 +405,38 @@ struct RichTextEditorWrapper: NSViewRepresentable {
 
             // Then update the binding
             parent.attributedText = textView.attributedString()
+        }
+
+        func textViewDidChangeSelection(_ notification: Notification) {
+            guard let textView = notification.object as? NSTextView else { return }
+
+            let selectedRange = textView.selectedRange()
+
+            // Only show toolbar if text is actually selected
+            if selectedRange.length > 0 {
+                // Calculate bounds of selection
+                if let layoutManager = textView.layoutManager,
+                   let textContainer = textView.textContainer {
+                    let glyphRange = layoutManager.glyphRange(
+                        forCharacterRange: selectedRange,
+                        actualCharacterRange: nil
+                    )
+                    var boundingRect = layoutManager.boundingRect(
+                        forGlyphRange: glyphRange,
+                        in: textContainer
+                    )
+
+                    // Convert to view coordinates
+                    boundingRect.origin.x += textView.textContainerInset.width
+                    boundingRect.origin.y += textView.textContainerInset.height
+
+                    // Call the callback with selection info
+                    parent.onSelectionChange?(selectedRange, boundingRect)
+                }
+            } else {
+                // No selection, hide toolbar
+                parent.onSelectionChange?(selectedRange, .zero)
+            }
         }
     }
 }

@@ -11,6 +11,7 @@ import AppKit
 
 /// Notion-inspired editor view with rich text editing and formatting toolbar
 /// Supports inline formatting: bold, italic, headings, lists, etc.
+/// Keyboard shortcuts: Cmd+B (bold), Cmd+I (italic), Cmd+Shift+1-3 (headings)
 struct NotionEditorView: View {
     @Environment(\.managedObjectContext) private var context
     @State private var service: CoreDataService
@@ -21,9 +22,17 @@ struct NotionEditorView: View {
     @State private var textViewRef: NSTextView?
 
     @ObservedObject var note: Note
+    @Binding var currentTextView: NSTextView?
+    @Binding var formatAction: ((FormattingAction) -> Void)?
 
-    init(note: Note) {
+    init(
+        note: Note,
+        currentTextView: Binding<NSTextView?> = .constant(nil),
+        formatAction: Binding<((FormattingAction) -> Void)?> = .constant(nil)
+    ) {
         self.note = note
+        self._currentTextView = currentTextView
+        self._formatAction = formatAction
         self._service = State(initialValue: CoreDataService())
         self._title = State(initialValue: note.title ?? "")
 
@@ -85,6 +94,16 @@ struct NotionEditorView: View {
         }
         .onChange(of: attributedContent) { _, newValue in
             saveNote()
+        }
+        .onChange(of: textViewRef) { _, newValue in
+            // Update the current text view reference for keyboard shortcuts
+            currentTextView = newValue
+        }
+        .onAppear {
+            // Set up format action handler for menu commands
+            formatAction = { action in
+                handleFormattingAction(action)
+            }
         }
     }
 

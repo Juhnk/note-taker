@@ -6,11 +6,22 @@
 //
 
 import SwiftUI
+import AppKit
 
 /// Main application view with Notion-inspired split layout
 /// Sidebar (224px) + Editor/Content area
 struct MainView: View {
     @State private var selectedNote: Note?
+    @Binding var currentTextView: NSTextView?
+    @Binding var formatAction: ((FormattingAction) -> Void)?
+
+    init(
+        currentTextView: Binding<NSTextView?> = .constant(nil),
+        formatAction: Binding<((FormattingAction) -> Void)?> = .constant(nil)
+    ) {
+        self._currentTextView = currentTextView
+        self._formatAction = formatAction
+    }
 
     var body: some View {
         NavigationSplitView {
@@ -19,7 +30,11 @@ struct MainView: View {
         } detail: {
             // Detail/Editor view
             if let note = selectedNote {
-                NotionEditorView(note: note)
+                NotionEditorView(
+                    note: note,
+                    currentTextView: $currentTextView,
+                    formatAction: $formatAction
+                )
             } else {
                 emptyStateView
             }

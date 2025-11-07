@@ -58,18 +58,19 @@ struct PersistenceController {
                 description.url = URL(fileURLWithPath: "/dev/null")
             }
         } else {
-            // Configure CloudKit sync only if available
+            // Configure persistent store
             guard let description = container.persistentStoreDescriptions.first else {
                 fatalError("Failed to retrieve persistent store description")
             }
 
+            // Always enable persistent history tracking (even without CloudKit)
+            // This is required once enabled, and is good practice for multi-context scenarios
+            description.setOption(true as NSNumber,
+                                forKey: NSPersistentHistoryTrackingKey)
+
             if Self.isCloudKitAvailable {
                 // CloudKit is available - enable full sync
                 print("CloudKit is available - enabling sync")
-
-                // Enable persistent history tracking for CloudKit
-                description.setOption(true as NSNumber,
-                                    forKey: NSPersistentHistoryTrackingKey)
 
                 // Enable remote change notifications
                 description.setOption(true as NSNumber,

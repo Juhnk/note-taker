@@ -14,8 +14,9 @@ struct NoteTakerApp: App {
 
     var body: some Scene {
         WindowGroup {
-            HomeView()
+            MainView()
                 .environment(\.managedObjectContext, persistenceController.container.viewContext)
         }
+        .defaultSize(width: 1200, height: 800)
     }
 }

@@ -36,6 +36,20 @@ struct PersistenceController {
 
     let container: NSPersistentCloudKitContainer
 
+    /// Check if CloudKit is available (requires paid Apple Developer account)
+    private static var isCloudKitAvailable: Bool {
+        // CloudKit requires the com.apple.developer.icloud-services entitlement
+        // This is only available with a paid Apple Developer Program account ($99/year)
+        #if targetEnvironment(simulator)
+        // Always disable CloudKit in simulator to avoid entitlement issues
+        return false
+        #else
+        // Check if entitlements are present
+        let entitlements = Bundle.main.object(forInfoDictionaryKey: "com.apple.developer.icloud-services") as? [String]
+        return entitlements?.contains("CloudKit") ?? false
+        #endif
+    }
+
     init(inMemory: Bool = false) {
         container = NSPersistentCloudKitContainer(name: "NoteTaker")
 
@@ -44,26 +58,39 @@ struct PersistenceController {
                 description.url = URL(fileURLWithPath: "/dev/null")
             }
         } else {
-            // Configure CloudKit sync
+            // Configure CloudKit sync only if available
             guard let description = container.persistentStoreDescriptions.first else {
                 fatalError("Failed to retrieve persistent store description")
             }
 
-            // Enable persistent history tracking for CloudKit
-            description.setOption(true as NSNumber,
-                                forKey: NSPersistentHistoryTrackingKey)
+            if Self.isCloudKitAvailable {
+                // CloudKit is available - enable full sync
+                print("CloudKit is available - enabling sync")
 
-            // Enable remote change notifications
-            description.setOption(true as NSNumber,
-                                forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)
+                // Enable persistent history tracking for CloudKit
+                description.setOption(true as NSNumber,
+                                    forKey: NSPersistentHistoryTrackingKey)
 
-            // CloudKit container options
-            // Note: This requires a paid Apple Developer Program account ($99/year)
-            // Container ID must match the one in NoteTaker.entitlements
-            let cloudKitContainerOptions = NSPersistentCloudKitContainerOptions(
-                containerIdentifier: "iCloud.com.juhnk.NoteTaker"
-            )
-            description.cloudKitContainerOptions = cloudKitContainerOptions
+                // Enable remote change notifications
+                description.setOption(true as NSNumber,
+                                    forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)
+
+                // CloudKit container options
+                let cloudKitContainerOptions = NSPersistentCloudKitContainerOptions(
+                    containerIdentifier: "iCloud.com.juhnk.NoteTaker"
+                )
+                description.cloudKitContainerOptions = cloudKitContainerOptions
+            } else {
+                // CloudKit not available - disable sync and run locally only
+                print("CloudKit not available - running in local-only mode")
+                print("To enable CloudKit sync:")
+                print("1. Enroll in Apple Developer Program ($99/year)")
+                print("2. Enable iCloud capability in Xcode")
+                print("3. Sign the app with your developer account")
+
+                // Explicitly disable CloudKit
+                description.cloudKitContainerOptions = nil
+            }
         }
 
         container.loadPersistentStores(completionHandler: { (_, error) in
